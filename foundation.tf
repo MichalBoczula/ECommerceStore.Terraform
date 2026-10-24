@@ -22,12 +22,11 @@ resource "azurerm_resource_group" "store" {
 }
 
 resource "azurerm_container_app_environment" "store" {
-  name                    = "cae-ecommercestore-dev"
-  resource_group_name     = azurerm_resource_group.store.name
-  location                = var.location
-  public_network_access   = "Enabled"
-  zone_redundancy_enabled = false
-  tags                    = local.tags
+  name                  = "cae-ecommercestore-dev"
+  resource_group_name   = azurerm_resource_group.store.name
+  location              = var.location
+  public_network_access = "Enabled"
+  tags                  = local.tags
 
   # No custom VNet and no saved logs. The built-in live log stream still works.
   workload_profile {
