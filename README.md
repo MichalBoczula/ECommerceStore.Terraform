@@ -31,7 +31,7 @@ still required. There are no Internet-wide database firewall rules or outbound I
 | Products | 10 |
 | Products + BFF | 11 |
 | Products + BFF + Web | 12 |
-| All four, including Users later | 13 |
+| All four, including Users | 13 |
 
 Counts exclude provider registrations, Azure-managed supporting resources and the
 existing state storage. Resource names and passwords stay stable between runs.
@@ -357,13 +357,118 @@ BFF/UI also contain Users, Invoice and Payments features; complete registration,
 cart, orders and checkout require those services later. Use demo data: the customer
 selector is not authentication.
 
-Users can later be added as `users = "mb0101/ecommerce-store-users-api:<published-commit-sha>"`.
-Before claiming it works, verify its replica-set readiness probe, named indexes and
-customer/history transaction rollback against DocumentDB. These have not been tested
-in Azure. Terraform takes the connection string from DocumentDB rather than guessing it.
-
 Do not remove existing image entries when adding another app: removal plans to
 destroy that Container App. Leave entries present to retain the applications.
+
+## 7. Deploy Users
+
+The existing foundation already contains the DocumentDB Free cluster and its Azure
+services firewall rule. Adding Users creates **one Container App**, reusing that
+cluster and the same ACA environment. BFF already has its Users destination and
+routes; Web forwards those requests through `/backend`.
+
+Pull the update and add the `users` entry to your existing `app_images` map in
+`terraform.tfvars`. Keep all three deployed images and the same database passwords
+and Docker Hub token:
+
+```hcl
+app_images = {
+  products = "docker.io/mb0101/product-catalog-api@sha256:dd92571adbbe889faacca4c0a72b4296a64e234c0ca9d57c9cf85b08bbd054d8"
+  bff      = "docker.io/mb0101/ecommerce-store-bff-api@sha256:ccf624855827c6ca0d59ffbf4b19459ad0d5899bbe997ba90ecabfd5e528873a"
+  web      = "docker.io/mb0101/ecommerce-store-web@sha256:b8738eb18d2de58045a408c1b1df79b04bb9ba673bec848983031a03cc19773d"
+  users    = "docker.io/mb0101/ecommerce-store-users-api@sha256:640624f8daa0cbe981e7bf475312564faa947b71c10e1dd343a279ca8cdaa51d"
+}
+```
+
+The selected Linux/amd64 image is published from Users commit
+`815cff4aa173dbc1ec36331c50b072f09b098df4`, including the reviewed
+[DocumentDB readiness fix](https://github.com/MichalBoczula/ECommerceStoreUsers/pull/130).
+Its [master CI run](https://github.com/MichalBoczula/ECommerceStoreUsers/actions/runs/40125453419)
+passed build, formatting, generated contracts, unit/integration/acceptance suites,
+coverage, secret scanning, the quality gate, image scanning and publication.
+The Docker Hub full-commit tag resolved to this digest on 2026-10-24. Pinning it
+keeps later image publications from silently changing the deployment.
+
+Terraform supplies `MongoDbSettings__ConnectionString` through the app's existing
+`database-connection` secret, using the connection string returned by AzureRM.
+The provider inserts the administrator credentials held in state; no connection
+string or password needs copying from the portal. The database is
+`ecommerce-store-users-db`. Startup initialization stays enabled and creates the
+named collections/indexes. Readiness checks the writable replica set or router,
+session support and an application-database ping. Liveness remains independent
+of the database. This root does not use a preparation revision or outbound-IP script.
+
+Run each command separately and stop on an error:
+
+```powershell
+git pull --ff-only
+terraform fmt -check
+terraform validate
+terraform plan "-out=users.tfplan"
+```
+
+With Products, BFF and Web already deployed and no other drift, expect
+**1 to add, 0 to change, 0 to destroy**: `azurerm_container_app.app["users"]`.
+The existing database, storage and other Container Apps should remain untouched.
+
+```powershell
+terraform apply users.tfplan
+$appUrls = terraform output -json app_urls | ConvertFrom-Json
+$usersUrl = $appUrls.users
+$bffUrl = $appUrls.bff
+$webUrl = $appUrls.web
+Invoke-RestMethod "$usersUrl/health/ready" -TimeoutSec 180
+Start-Process "$usersUrl/swagger"
+Start-Process "$bffUrl/scalar/users"
+```
+
+Expect `Healthy`. Check a Mongo-backed read through the Web origin:
+
+```powershell
+$clientId = [guid]::NewGuid().ToString()
+$favorites = Invoke-RestMethod "$webUrl/backend/favorites/clients/$clientId" -TimeoutSec 180
+$favorites.Count
+```
+
+A new client's favorites should return HTTP 200 and an empty list. This exercises
+**Web → BFF → Users → DocumentDB**. On a cold-start timeout, retry the request.
+If startup fails, view the Users console logs:
+
+```powershell
+az containerapp logs show --name ca-ecommercestore-users-dev --resource-group rg-ecommercestore-dev --type console --tail 100 --format text
+```
+
+### Check a customer transaction
+
+Readiness and a GET do not exercise writes. The following creates one demo customer
+through Web/BFF and reads it back. Use demo values only; each run uses a new external
+ID and leaves that demo customer in the database.
+
+```powershell
+$externalId = "aca-demo-$([guid]::NewGuid())"
+$address = @{
+  postalCode = '00-001'; city = 'Warsaw'; street = 'Main Street'
+  buildingNumber = '10'; apartmentNumber = '20'
+}
+$body = @{
+  externalId = $externalId
+  individual = @{
+    firstName = 'Demo'; lastName = 'Customer'
+    email = 'demo@example.com'; phone = '123456789'
+    billingAddress = $address; shippingAddress = $address
+  }
+  companies = @()
+} | ConvertTo-Json -Depth 5
+$customer = Invoke-RestMethod "$webUrl/backend/customers/" -Method Post -ContentType 'application/json' -Body $body -TimeoutSec 180
+$savedCustomer = Invoke-RestMethod "$webUrl/backend/customers/external/$externalId" -TimeoutSec 180
+$customer.id -eq $savedCustomer.id
+```
+
+Expect `True`. The create path writes the customer and its history in one
+transaction. These commands have not been executed against your Azure cluster here;
+they verify a successful create/read when you run them. Direct inspection of
+current/history documents and forced-failure rollback remain separate hosted-database
+checks; passing native MongoDB CI alone does not prove those Azure behaviors.
 
 ## Cleanup
 

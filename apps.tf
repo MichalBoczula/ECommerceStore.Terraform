@@ -42,9 +42,10 @@ locals {
       live_path  = "/health/live"
       ready_path = "/health/ready"
       env = {
-        ASPNETCORE_ENVIRONMENT        = "Production"
-        ASPNETCORE_HTTP_PORTS         = "8080"
-        MongoDbSettings__DatabaseName = "ecommerce-store-users-db"
+        ASPNETCORE_ENVIRONMENT               = "Production"
+        ASPNETCORE_HTTP_PORTS                = "8080"
+        MongoDbSettings__DatabaseName        = "ecommerce-store-users-db"
+        MongoDbSettings__InitializeOnStartup = "true"
       }
       secrets = {
         "database-connection" = azurerm_mongo_cluster.users.connection_strings[0].value
