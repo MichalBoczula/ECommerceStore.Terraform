@@ -196,11 +196,72 @@ phones and their Blob photo URLs. Open one photo URL as well. The first request 
 be slow while ACA and SQL resume; if readiness returns 503, wait briefly and retry
 the same request. Liveness alone does not prove database connectivity.
 
-## 5. Add BFF, then Web
+## 5. Deploy BFF
 
-Keep Products and add `bff = "mb0101/ecommerce-store-bff-api:<published-commit-sha>"`.
-Plan/apply. YARP receives the Products URL automatically. Verify
-`/mobile-phones?amount=15` through BFF before proceeding.
+After Products readiness, Swagger and photo checks succeed, keep its image entry
+and add BFF to the same `app_images` block in your existing `terraform.tfvars`:
+
+```hcl
+app_images = {
+  products = "docker.io/mb0101/product-catalog-api@sha256:dd92571adbbe889faacca4c0a72b4296a64e234c0ca9d57c9cf85b08bbd054d8"
+  bff      = "docker.io/mb0101/ecommerce-store-bff-api@sha256:ccf624855827c6ca0d59ffbf4b19459ad0d5899bbe997ba90ecabfd5e528873a"
+}
+```
+
+The selected BFF image is Linux/amd64, published from commit
+`3bbbe1c1eb7e76fc60b1bfeebeba613c9477ad7b`. Its [CI run](https://github.com/MichalBoczula/ECommerceStoreBFF/actions/runs/39057689508)
+passed integration tests, the quality gate, container smoke test, image scan and
+publication. Docker Hub's commit tag and `latest` resolved to this digest when
+checked on 2026-10-24.
+
+Terraform already sets port 8080, `/health` probes, 0–1 replicas and YARP's Products
+destination to the Products HTTPS URL in this environment. The BFF needs no database
+credentials of its own. This step adds one Container App and reuses the existing
+environment and Docker Hub pull credentials.
+
+```powershell
+git pull --ff-only
+terraform validate
+terraform plan "-out=bff.tfplan"
+```
+
+Run commands separately. Keep the same database passwords and the working
+`TF_VAR_dockerhub_token` from the Products deployment in this shell. `docker login`
+alone does not supply Terraform's token, and GitHub Actions secrets do not populate
+local variables. If starting a new shell, enter the same token as shown above.
+Do not define `dockerhub_token` in `terraform.tfvars`, where it would override the
+environment variable. Keep `dockerhub_username = "mb0101"`.
+
+With Products already applied and no drift, expect **1 to add, 0 to change, 0 to
+destroy**: `azurerm_container_app.app["bff"]`. Apply the new plan:
+
+```powershell
+terraform apply bff.tfplan
+```
+
+Verify the BFF process, then an actual request through BFF to Products and SQL:
+
+```powershell
+$appUrls = terraform output -json app_urls | ConvertFrom-Json
+$productsUrl = $appUrls.products
+$bffUrl = $appUrls.bff
+Invoke-RestMethod "$productsUrl/health/ready" -TimeoutSec 180
+Invoke-RestMethod "$bffUrl/health" -TimeoutSec 180
+$phones = Invoke-RestMethod "$bffUrl/mobile-phones?amount=15" -TimeoutSec 180
+$phones.Count
+$phones | Select-Object name, mainPhoto
+Start-Process "$bffUrl/scalar/products"
+```
+
+Both health requests should return `Healthy`; the product count should be 15.
+The first Products readiness request warms SQL before testing the gateway. A BFF
+health result alone does not check any upstream API. The product route remains
+`/mobile-phones`; `/api/products` is a prefix only for the proxied OpenAPI document
+at `/api/products/swagger/v1/swagger.json`. The BFF serves Scalar at
+`/scalar/products`, rather than its own Swagger UI. Users, Orders and Payments
+routes require their applications to be deployed later.
+
+## 6. Deploy Web next
 
 **Before enabling Web, update its Nginx configuration in the application repo.**
 The current image uses the Compose destination `http://bff:8080` and forwards the
