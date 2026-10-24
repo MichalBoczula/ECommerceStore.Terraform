@@ -1,0 +1,10 @@
+subscription_id = "fcbf086b-8ce4-4ca5-a3d7-0c56489e25f6"
+
+# Start with the shared infrastructure. Add real apps in subsequent applies.
+app_images = {}
+
+# Keep this name to match existing Products photo URLs.
+photo_storage_account_name = "stecproductsdevmb261013"
+
+# Set passwords through TF_VAR_sql_admin_password / TF_VAR_mongo_admin_password.
+# Never put them in this example or commit your local terraform.tfvars.
