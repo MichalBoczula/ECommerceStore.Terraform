@@ -90,7 +90,10 @@ terraform validate
 terraform plan "-out=deploy.tfplan"
 ```
 
-Run the commands one at a time and stop if one fails. In PowerShell, quote the whole\n`"-out=deploy.tfplan"` argument to keep it as one native command-line argument.\n\nReview: expect **9 additions**, no deletion or migration of old infrastructure.
+Run the commands one at a time and stop if one fails. In PowerShell, quote the whole
+`"-out=deploy.tfplan"` argument to keep it as one native command-line argument.
+
+Review: expect **9 additions**, no deletion or migration of old infrastructure.
 Apply the reviewed plan:
 
 ```powershell
