@@ -263,12 +263,17 @@ routes require their applications to be deployed later.
 
 ## 6. Deploy Web
 
-The Web image supports the `BFF_URL` container setting. Terraform supplies the BFF
-HTTPS origin automatically. The official Nginx image renders its template at
-startup, removes `/backend` when proxying and sends the BFF Host and TLS SNI.
-The browser uses same-origin requests, so no additional CORS configuration is
-required for this flow. There is no custom startup script or per-environment
-Angular rebuild. Docker Compose retains its default `http://bff:8080` destination.
+The Web image supports the `BFF_URL` container setting. Terraform supplies
+`http://ca-ecommercestore-bff-dev`, using ACA's built-in app-name service discovery
+inside the shared environment. Microsoft documents this address format for
+[calls between apps in the same environment](https://learn.microsoft.com/en-us/azure/container-apps/connect-apps#call-a-container-app-by-name).
+The app-name HTTP endpoint uses ingress port 80; ACA routes it to BFF's target
+port 8080. Its behavior is separate from the public FQDN's HTTPS redirect setting.
+
+The official Nginx image renders its template at startup, removes `/backend` when
+proxying and sends the BFF Host. Browser access remains HTTPS with same-origin API
+requests. There is no custom startup script or per-environment Angular rebuild.
+Docker Compose retains its default `http://bff:8080` destination.
 
 Keep both existing applications and add Web in your local `terraform.tfvars`:
 
@@ -303,6 +308,30 @@ checks the SPA, not the upstream services. Apply the fresh plan:
 ```powershell
 terraform apply web.tfplan
 ```
+
+### Repair an existing Web deployment using the BFF HTTPS address
+
+If Web returns Nginx 502 responses and its log reports
+`upstream SSL certificate verify error: (20:unable to get local issuer certificate)`,
+pull the current configuration and apply its internal BFF app-name address.
+The existing Web image already supports this setting; keep all image entries and
+the same database/Docker Hub credentials. No image rebuild is needed.
+
+```powershell
+git pull --ff-only
+terraform validate
+terraform plan "-out=web-connection.tfplan"
+```
+
+With Web already deployed and no other drift, expect **0 to add, 1 to change, 0 to
+destroy**, updating only `azurerm_container_app.app["web"]`. The `BFF_URL` setting
+changes from the BFF HTTPS FQDN to `http://ca-ecommercestore-bff-dev`.
+
+```powershell
+terraform apply web-connection.tfplan
+```
+
+### Verify the Web flow
 
 Check the catalog through the Web origin, then open the storefront:
 
