@@ -19,3 +19,15 @@ resource "azurerm_mongo_cluster_firewall_rule" "azure" {
   start_ip_address = "0.0.0.0"
   end_ip_address   = "0.0.0.0"
 }
+
+locals {
+  # AzureRM can retain the previous password in its computed connection string
+  # during a password update. Keep Azure's endpoint/options, but use this plan's
+  # credentials so the ACA secret stays consistent throughout apply.
+  users_connection_string = format(
+    "mongodb+srv://%s:%s@%s",
+    urlencode(azurerm_mongo_cluster.users.administrator_username),
+    replace(urlencode(var.mongo_admin_password), "+", "%20"),
+    split("@", azurerm_mongo_cluster.users.connection_strings[0].value)[1],
+  )
+}

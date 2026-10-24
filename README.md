@@ -390,8 +390,10 @@ The Docker Hub full-commit tag resolved to this digest on 2026-10-24. Pinning it
 keeps later image publications from silently changing the deployment.
 
 Terraform supplies `MongoDbSettings__ConnectionString` through the app's existing
-`database-connection` secret, using the connection string returned by AzureRM.
-The provider inserts the administrator credentials held in state; no connection
+`database-connection` secret. It preserves the endpoint and options from Azure's
+connection string and inserts the configured administrator username and URL-encoded
+`mongo_admin_password`. This avoids carrying a previous password from AzureRM's
+computed connection string into the app's plan during password updates. No connection
 string or password needs copying from the portal. The database is
 `ecommerce-store-users-db`. Startup initialization stays enabled and creates the
 named collections/indexes. Readiness checks the writable replica set or router,
@@ -437,6 +439,42 @@ If startup fails, view the Users console logs:
 ```powershell
 az containerapp logs show --name ca-ecommercestore-users-dev --resource-group rg-ecommercestore-dev --type console --tail 100 --format text
 ```
+
+### Recover from an inconsistent Users secret plan
+
+If Mongo's password update completes but Users creation fails with
+`Provider produced inconsistent final plan` for `.secret`, pull this configuration.
+The Users secret now combines Azure's endpoint/options with this plan's password,
+instead of relying on the password embedded in AzureRM's computed connection string.
+The completed Mongo update is retained; no database recreation or state editing is
+needed for this failure.
+
+Some provider error diagnostics print secret values in plain text. If a password
+was exposed, replace `mongo_admin_password` locally before generating the recovery
+plan. Update whichever source supplies it (your ignored variables file or
+`TF_VAR_mongo_admin_password`); keep the other database and Docker Hub credentials.
+Do not paste passwords or full connection strings into troubleshooting output.
+
+Run separately and stop on any failure. Use a fresh plan file:
+
+```powershell
+git pull --ff-only
+terraform fmt -check
+terraform validate
+terraform plan "-out=users-retry.tfplan"
+```
+
+If you changed the Mongo password, expect **1 to add, 1 to change, 0 to destroy**:
+Users creation and the Mongo password update. With the already-applied password
+unchanged, expect **1 to add, 0 to change, 0 to destroy**. The error occurred before
+Users creation, so this error alone does not require an import or an Azure deletion.
+
+```powershell
+terraform apply users-retry.tfplan
+```
+
+Then run the readiness and Web/BFF checks above. Never reuse `users.tfplan` after
+a partial apply or a password/configuration change.
 
 ### Check a customer transaction
 

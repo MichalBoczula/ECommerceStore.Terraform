@@ -48,7 +48,7 @@ locals {
         MongoDbSettings__InitializeOnStartup = "true"
       }
       secrets = {
-        "database-connection" = azurerm_mongo_cluster.users.connection_strings[0].value
+        "database-connection" = local.users_connection_string
       }
       secret_env = { MongoDbSettings__ConnectionString = "database-connection" }
     }
