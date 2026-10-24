@@ -79,7 +79,8 @@ $env:TF_VAR_mongo_admin_password = Read-Host 'DocumentDB password' -AsSecureStri
 
 State and saved plans contain secrets despite masked CLI output. Local variables,
 state and plan files are ignored by Git. A different password plans a rotation.
-Optional `TF_VAR_dockerhub_token` supplies a read-only `mb0101` image-pull token.
+Optional `TF_VAR_dockerhub_token` supplies a read-only Docker Hub image-pull token;
+`dockerhub_username` defaults to `mb0101`.
 
 ## 2. Create the foundation
 
@@ -125,23 +126,75 @@ folder says Black; that application content correction remains separate.
 
 ## 4. Deploy Products next
 
-Once the foundation is verified, replace `app_images` in your existing variables file:
+Keep the same PowerShell session and database passwords used for the foundation.
+Pull the repository update with `git pull --ff-only`. In your existing
+`terraform.tfvars`, replace the `app_images = {}` entry with the following block;
+keep your subscription, names and other existing settings:
 
 ```hcl
+dockerhub_username = "mb0101"
+
 app_images = {
-  products = "mb0101/product-catalog-api:<published-commit-sha>"
+  products = "docker.io/mb0101/product-catalog-api@sha256:dd92571adbbe889faacca4c0a72b4296a64e234c0ca9d57c9cf85b08bbd054d8"
 }
 ```
 
-Use an actual published SHA tag or digest. Terraform supplies the SQL connection as
-an ACA secret, enables EF migrations and configures independent liveness and database
-readiness probes. This disposable environment uses the SQL administrator for both
-migrations and runtime access.
+The selected Linux/amd64 image is published from Products commit
+`e81f779393780c95b878463beb710481e4d744c4`. Its [CI run](https://github.com/MichalBoczula/ProductsCatalog/actions/runs/38964842210)
+passed its quality gate, image scan and publish step. The Docker Hub SHA tag and
+`latest` resolved to this digest when checked on 2026-10-24. Pinning the digest means
+a future `latest` publication cannot silently change this deployment.
 
-Run `terraform plan "-out=deploy.tfplan"`, review, then `terraform apply deploy.tfplan`.
-Check `terraform output app_urls`, then Products `/health/ready`,
-`/mobile-phones?amount=15` and an image URL. The first request can be slow while ACA
-and SQL resume. Liveness alone does not prove database connectivity.
+Follow [Docker's personal access token instructions](https://docs.docker.com/security/access-tokens/personal-access-tokens/)
+to create a token named `ecommerce-aca-pull` with read-only repository access.
+For this public image, Public Read-only is sufficient. Enter the token locally:
+
+```powershell
+$env:TF_VAR_dockerhub_token = [System.Net.NetworkCredential]::new('', (Read-Host 'Docker Hub read-only token' -AsSecureString)).Password
+```
+
+Terraform puts the token in the Container App's `dockerhub-token` secret and
+configures `docker.io` to use it with `dockerhub_username`. No extra Azure resource
+is required. This credential is for ACA pulls; GitHub Actions' publishing credentials
+are independent. Re-enter the same token in a new shell before later plans, or its
+unset optional value will plan to remove authenticated pulls. Saved plans and remote
+state contain secrets; keep them private.
+
+Run these separately and stop on any failure:
+
+```powershell
+terraform validate
+terraform plan "-out=deploy.tfplan"
+```
+
+With the foundation already applied and no configuration drift, expect
+**1 to add, 0 to change, 0 to destroy**: `azurerm_container_app.app["products"]`.
+The same app contains the registry secret and the SQL connection secret. If the
+plan replaces a database or storage account, check the names/passwords before applying.
+
+```powershell
+terraform apply deploy.tfplan
+```
+
+Terraform supplies the SQL connection as an ACA secret, enables EF migrations and
+configures independent liveness and database readiness probes. This disposable
+environment uses the SQL administrator for both migrations and runtime access.
+
+After apply, get the deployed URL and verify SQL readiness and the product list:
+
+```powershell
+$appUrls = terraform output -json app_urls | ConvertFrom-Json
+$productsUrl = $appUrls.products
+Invoke-RestMethod -Uri "$productsUrl/health/ready" -TimeoutSec 180
+$phones = Invoke-RestMethod -Uri "$productsUrl/mobile-phones?amount=15" -TimeoutSec 180
+$phones.Count
+$phones | Select-Object name, mainPhoto
+```
+
+Readiness should return `Healthy`; the product response should contain the 15 seeded
+phones and their Blob photo URLs. Open one photo URL as well. The first request can
+be slow while ACA and SQL resume; if readiness returns 503, wait briefly and retry
+the same request. Liveness alone does not prove database connectivity.
 
 ## 5. Add BFF, then Web
 

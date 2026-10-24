@@ -47,6 +47,12 @@ variable "app_images" {
   }
 }
 
+variable "dockerhub_username" {
+  description = "Docker Hub username for authenticated image pulls."
+  type        = string
+  default     = "mb0101"
+}
+
 variable "dockerhub_token" {
   description = "Optional read-only Docker Hub token for authenticated image pulls. Public images work without it."
   type        = string

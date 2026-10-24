@@ -3,6 +3,10 @@ subscription_id = "fcbf086b-8ce4-4ca5-a3d7-0c56489e25f6"
 # Start with the shared infrastructure. Add real apps in subsequent applies.
 app_images = {}
 
+# Non-secret registry username. Provide its read-only token through
+# TF_VAR_dockerhub_token in PowerShell; Terraform stores it as an ACA secret.
+dockerhub_username = "mb0101"
+
 # Keep this name to match existing Products photo URLs.
 photo_storage_account_name = "stecproductsdevmb261013"
 

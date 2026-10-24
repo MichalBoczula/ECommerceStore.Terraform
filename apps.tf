@@ -84,7 +84,7 @@ resource "azurerm_container_app" "app" {
     for_each = var.dockerhub_token == null ? [] : ["docker.io"]
     content {
       server               = registry.value
-      username             = "mb0101"
+      username             = var.dockerhub_username
       password_secret_name = "dockerhub-token"
     }
   }
