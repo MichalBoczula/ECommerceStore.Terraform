@@ -33,7 +33,7 @@ locals {
       port       = 80
       live_path  = "/"
       ready_path = "/"
-      env        = {}
+      env        = { BFF_URL = local.app_urls.bff }
       secrets    = {}
       secret_env = {}
     }

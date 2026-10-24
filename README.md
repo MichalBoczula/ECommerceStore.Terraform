@@ -261,16 +261,69 @@ at `/api/products/swagger/v1/swagger.json`. The BFF serves Scalar at
 `/scalar/products`, rather than its own Swagger UI. Users, Orders and Payments
 routes require their applications to be deployed later.
 
-## 6. Deploy Web next
+## 6. Deploy Web
 
-**Before enabling Web, update its Nginx configuration in the application repo.**
-The current image uses the Compose destination `http://bff:8080` and forwards the
-frontend Host header. It needs the deployed BFF HTTPS URL, correct BFF Host/SNI and
-the existing `/backend` prefix removal. Publish that updated image, then add
-`web = "mb0101/ecommerce-store-web:<published-commit-sha>"` beside the existing entries.
-Terraform does not rewrite Nginx or inject an environment variable the image cannot read.
+The Web image supports the `BFF_URL` container setting. Terraform supplies the BFF
+HTTPS origin automatically. The official Nginx image renders its template at
+startup, removes `/backend` when proxying and sends the BFF Host and TLS SNI.
+The browser uses same-origin requests, so no additional CORS configuration is
+required for this flow. There is no custom startup script or per-environment
+Angular rebuild. Docker Compose retains its default `http://bff:8080` destination.
 
-Verify **Web → `/backend` → BFF → Products → SQL**, including photos. The current
+Keep both existing applications and add Web in your local `terraform.tfvars`:
+
+```hcl
+app_images = {
+  products = "docker.io/mb0101/product-catalog-api@sha256:dd92571adbbe889faacca4c0a72b4296a64e234c0ca9d57c9cf85b08bbd054d8"
+  bff      = "docker.io/mb0101/ecommerce-store-bff-api@sha256:ccf624855827c6ca0d59ffbf4b19459ad0d5899bbe997ba90ecabfd5e528873a"
+  web      = "docker.io/mb0101/ecommerce-store-web@sha256:b8738eb18d2de58045a408c1b1df79b04bb9ba673bec848983031a03cc19773d"
+}
+```
+
+The selected Linux/amd64 Web image is published from commit
+`754c7ac434c74c2010bc0f61f68c32977228323d`. Its [CI run](https://github.com/MichalBoczula/ecommerce-store-web/actions/runs/40115947706)
+passed build, contract drift, dependency audit, unit coverage, browser acceptance,
+container smoke and image scan before publication. The digest was checked on
+2026-10-24.
+
+Keep the same database passwords and working `TF_VAR_dockerhub_token` in your shell.
+Run these commands separately after pulling the repository update:
+
+```powershell
+git pull --ff-only
+terraform validate
+terraform plan "-out=web.tfplan"
+```
+
+With Products and BFF already applied and no drift, expect **1 to add, 0 to change,
+0 to destroy**: `azurerm_container_app.app["web"]`. The web container uses port 80,
+0–1 replicas and `/` for its startup, liveness and readiness probes. The root probe
+checks the SPA, not the upstream services. Apply the fresh plan:
+
+```powershell
+terraform apply web.tfplan
+```
+
+Check the catalog through the Web origin, then open the storefront:
+
+```powershell
+$appUrls = terraform output -json app_urls | ConvertFrom-Json
+$productsUrl = $appUrls.products
+$webUrl = $appUrls.web
+Invoke-RestMethod "$productsUrl/health/ready" -TimeoutSec 180
+Invoke-RestMethod "$webUrl/backend/health" -TimeoutSec 180
+$phones = Invoke-RestMethod "$webUrl/backend/mobile-phones?amount=15" -TimeoutSec 180
+$phones.Count
+$phones | Select-Object name, mainPhoto
+Start-Process $webUrl
+```
+
+Expect both health responses to be `Healthy`, 15 products through the Web origin,
+and catalog cards with their Blob photos in the browser. Follow a product details
+link and refresh that page to check Nginx's SPA fallback. Cold ACA replicas and SQL
+may make the first request slow; after a cold-start timeout, retry the request.
+
+This verifies **Web → `/backend` → BFF → Products → SQL**, including photos. The current
 BFF/UI also contain Users, Invoice and Payments features; complete registration,
 cart, orders and checkout require those services later. Use demo data: the customer
 selector is not authentication.
