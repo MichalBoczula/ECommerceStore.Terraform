@@ -38,7 +38,7 @@ existing state storage. Resource names and passwords stay stable between runs.
 
 ## 1. Prepare
 
-Install Terraform 1.16+ (below 2.0), Azure CLI and PowerShell 7. Providers are pinned
+Install Terraform 1.13.1+ (below 2.0), Azure CLI and PowerShell 7. Providers are pinned
 in `.terraform.lock.hcl`. AzAPI is used only for SQL Free properties absent in AzureRM.
 
 The existing backend from the screenshot is configured in `terraform.tf`:
@@ -87,10 +87,10 @@ Optional `TF_VAR_dockerhub_token` supplies a read-only `mb0101` image-pull token
 terraform init
 terraform fmt -check
 terraform validate
-terraform plan -out=deploy.tfplan
+terraform plan "-out=deploy.tfplan"
 ```
 
-Review: expect **9 additions**, no deletion or migration of old infrastructure.
+Run the commands one at a time and stop if one fails. In PowerShell, quote the whole\n`"-out=deploy.tfplan"` argument to keep it as one native command-line argument.\n\nReview: expect **9 additions**, no deletion or migration of old infrastructure.
 Apply the reviewed plan:
 
 ```powershell
@@ -135,7 +135,7 @@ an ACA secret, enables EF migrations and configures independent liveness and dat
 readiness probes. This disposable environment uses the SQL administrator for both
 migrations and runtime access.
 
-Run `terraform plan -out=deploy.tfplan`, review, then `terraform apply deploy.tfplan`.
+Run `terraform plan "-out=deploy.tfplan"`, review, then `terraform apply deploy.tfplan`.
 Check `terraform output app_urls`, then Products `/health/ready`,
 `/mobile-phones?amount=15` and an image URL. The first request can be slow while ACA
 and SQL resume. Liveness alone does not prove database connectivity.
@@ -171,7 +171,7 @@ destroy that Container App. Leave entries present to retain the applications.
 Only when you intend to delete this disposable store, including all application data:
 
 ```powershell
-terraform plan -destroy -out=destroy.tfplan
+terraform plan -destroy "-out=destroy.tfplan"
 terraform apply destroy.tfplan
 ```
 
