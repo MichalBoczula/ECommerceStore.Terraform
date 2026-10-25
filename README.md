@@ -513,7 +513,7 @@ they verify a successful create/read when you run them. Direct inspection of
 current/history documents and forced-failure rollback remain separate hosted-database
 checks; passing native MongoDB CI alone does not prove those Azure behaviors.
 
-## 8. Prepare Orders / Invoices
+## 8. Deploy Orders / Invoices
 
 The application repository is
 [ECommerceStoreInvoice](https://github.com/MichalBoczula/ECommerceStoreInvoice).
@@ -550,40 +550,33 @@ the new container is `invoices`. Its access type is `private`, independently of 
 public `photos` container. Connection strings are supplied to ACA as secrets and
 are not exposed as Terraform outputs. State and saved plans still contain secrets.
 
-### Required application work before enabling Orders
-
-As reviewed on 2026-10-25, Invoice master commit
-`76512ccf8c521cf3151830312acc5b82d2e31792` has a
-[successful publishing run](https://github.com/MichalBoczula/ECommerceStoreInvoice/actions/runs/36797439907),
-but that image still writes local PDFs with `file://` URLs. It has no Blob adapter
-or PDF download endpoint, and its readiness check requires a replica-set name
-instead of also accepting the DocumentDB router topology supported by Users.
-Do not enable that image or its `latest` tag as a completed Azure invoice deployment.
-
-Publish a new image after the application:
-
-- Supports DocumentDB readiness while retaining session and writable-primary/router
-  checks, and initializes its collections/indexes in the separate database.
-- Reads `InvoiceStorage:ConnectionString` and `InvoiceStorage:ContainerName`, uploads
-  PDFs to Blob through the SDK, and preserves the existing invoice reservation,
-  completion and failed-attempt cleanup behavior. Terraform cannot make local files
-  durable merely by creating a Blob container.
-- Uses the Chromium installed in its image instead of running browser installation
-  during invoice requests, and provides the intended API download path for private
-  PDFs. The current Web image displays invoice metadata; its download action also
-  needs application work before browser downloads can be claimed to work.
-
-These application changes are prerequisites, not functionality implemented by this
-Terraform root. No Orders image is selected by default, and this guide intentionally
-does not provide an old digest or a placeholder image to deploy.
-
 ### Enable the published application
 
-After those updates pass the app's existing CI and a compatible image is published,
-add an `orders` entry inside your existing `app_images` map using that image's
-immutable reference from `docker.io/mb0101/ecommerce-store-invoice-api`. Keep the
-Products, BFF, Web and Users entries. Do not create a second map or replace your
-current variables file with the example.
+The Blob storage and DocumentDB changes are implemented in
+[Invoice PR #218](https://github.com/MichalBoczula/ECommerceStoreInvoice/pull/218).
+The selected Linux/amd64 image is published from master commit `3b507354a2fc6fb5d1e9c0649c9553b3db4c494b`.
+Its [CI run](https://github.com/MichalBoczula/ECommerceStoreInvoice/actions/runs/40190685483) passed the build, formatting, generated contracts,
+unit/integration/acceptance suites, coverage, secret scanning, quality gate and image
+scan before publication. Docker Hub's commit tag resolved to the pinned digest below
+on 2026-10-25.
+
+Keep the Products, BFF, Web and Users entries and add this line **inside the existing
+`app_images` map** in your ignored `terraform.tfvars`:
+
+```hcl
+  orders = "docker.io/mb0101/ecommerce-store-invoice-api@sha256:fee09a35dcbd4f6fa823c468408dd1681b74f57c40a4d6213a7b2698f4152dfc"
+```
+
+Do not create a second map or replace your current variables file with the example.
+Keep the same database passwords and Docker Hub pull token in this PowerShell
+session. No Mongo or Blob connection string needs copying from the portal.
+
+The app now accepts writable DocumentDB routers with sessions, initializes its
+collections/indexes in its own database, and uploads PDFs into the private container
+before publishing completed invoices. It uses the Chromium already installed in the
+image. Production requires Blob configuration; local `file://` PDFs are reserved for
+development/testing. Existing invoice reservations, failed-attempt cleanup and
+ambiguous-completion recovery remain in place.
 
 The container contract is:
 
@@ -612,6 +605,8 @@ document. Web already forwards `/backend` to BFF; no new BFF routes or Web proxy
 settings are needed for these existing API calls.
 
 ```powershell
+git pull --ff-only
+terraform fmt -check
 terraform validate
 terraform plan "-out=orders.tfplan"
 ```
@@ -637,8 +632,24 @@ Invoke-RestMethod "$($appUrls.products)/health/ready" -TimeoutSec 180
 Invoke-RestMethod "$($appUrls.orders)/health/ready" -TimeoutSec 180
 $ordersApi = Invoke-RestMethod "$($appUrls.web)/backend/api/orders/swagger/v1/swagger.json" -TimeoutSec 180
 $ordersApi.info.title
+$ordersApi.paths.'/invoices/{invoiceId}/pdf'.get.operationId
 Start-Process "$($appUrls.bff)/scalar/orders"
 ```
+
+Expect `Healthy` from both readiness checks and `DownloadInvoicePdf` as the operation
+ID. The existing Web proxy and BFF route also forward the new PDF endpoint. After
+creating an invoice in Scalar, copy its ID and download through the Web origin:
+
+```powershell
+$invoiceId = Read-Host 'Completed invoice ID'
+Invoke-WebRequest "$($appUrls.web)/backend/invoices/$invoiceId/pdf" -OutFile "invoice-$invoiceId.pdf" -TimeoutSec 180
+Start-Process "invoice-$invoiceId.pdf"
+```
+
+Direct anonymous Blob URLs return an error because `invoices` is private. The API
+streams the PDF with `application/pdf`, a download filename and `private, no-store`.
+The currently deployed Web image displays invoice metadata; adding its download
+button remains a separate Web change. The API download above already uses Web/BFF.
 
 Readiness and OpenAPI do not prove checkout or PDF storage. Verify a cart-to-order
 transaction, paid-order invoice generation, Blob persistence and download through
@@ -646,8 +657,58 @@ Web/BFF. After restarting the Orders revision, download the same invoice again t
 verify it survives container replacement. Keep current/history/snapshot consistency,
 unique invoice reservation and failure rollback checks in the application suites.
 Payments is a separate deployment; use the existing order status API for a demo
-Paid transition until the payment service is deployed. These Azure checks must be
-performed after the compatible image is available; they have not been run here.
+Paid transition until the payment service is deployed. These Azure checks have not
+been run here. Readiness checks Mongo connectivity/topology; it does not test Blob
+permissions or PDF rendering. Ambiguous failed generations can retain orphan Blobs;
+automatic orphan cleanup remains separate work.
+
+### Check one demo checkout and invoice through Web/BFF
+
+After the readiness checks above succeed, run each command separately and stop on
+an error. This creates a demo client-data snapshot, one order and one invoice using
+a real seeded product. It leaves those records in Mongo and the PDF in Blob storage.
+The explicit `Paid` transition is a demo substitute for the undeployed payment service.
+
+```powershell
+$backend = "$($appUrls.web)/backend"
+$clientId = [guid]::NewGuid().ToString()
+$phones = Invoke-RestMethod "$backend/mobile-phones?amount=1" -TimeoutSec 180
+$productId = @($phones)[0].id
+Invoke-RestMethod "$backend/shopping-carts/$clientId" -Method Post -TimeoutSec 180
+$cartBody = @{ lines = @(@{ productId = $productId; quantity = 1 }) } | ConvertTo-Json -Depth 4
+Invoke-RestMethod "$backend/shopping-carts/$clientId" -Method Put -ContentType 'application/json' -Body $cartBody -TimeoutSec 180
+$order = Invoke-RestMethod "$backend/orders/client/$clientId" -Method Post -TimeoutSec 180
+$order.id
+$order.status
+$clearedCart = Invoke-RestMethod "$backend/shopping-carts/client/$clientId" -TimeoutSec 180
+@($clearedCart.lines).Count
+```
+
+Expect an order ID, `Created`, and zero remaining cart lines. Checkout calls Products
+and writes the order, product snapshots and cleared cart in one Mongo transaction.
+Next, supply demo invoice details and mark the order paid:
+
+```powershell
+$clientBody = @{
+  clientName = 'Demo Customer'; addressEmail = 'demo@example.com'
+  postalCode = '00-001'; city = 'Warsaw'; street = 'Main Street'
+  buildingNumber = '10'; apartmentNumber = '20'
+  phonePrefix = '48'; phoneNumber = '123456789'
+} | ConvertTo-Json
+Invoke-RestMethod "$backend/client-data-versions/$clientId" -Method Post -ContentType 'application/json' -Body $clientBody -TimeoutSec 180
+Invoke-RestMethod "$backend/orders/$($order.id)/status" -Method Patch -ContentType 'application/json' -Body '{"status":"Paid"}' -TimeoutSec 180
+$invoice = Invoke-RestMethod "$backend/invoices/$clientId/$($order.id)" -Method Post -TimeoutSec 180
+$invoice.id
+$invoice.storageUrl
+Invoke-WebRequest "$backend/invoices/$($invoice.id)/pdf" -OutFile "invoice-$($invoice.id).pdf" -TimeoutSec 180
+Start-Process "invoice-$($invoice.id).pdf"
+```
+
+The storage URL should point into the existing account's `invoices` container and
+contain no SAS token. Open the downloaded PDF, then restart the Orders revision in
+Azure and repeat the last two commands. The same invoice must remain downloadable.
+These are hosted validation commands for you to run; CI tests use isolated native
+Mongo, Azurite and HTTP fixtures rather than your Azure data.
 
 ## Cleanup
 
