@@ -13,28 +13,33 @@ is no automatic fallback to a paid database tier.
 | --- | ---: | --- |
 | Resource group | 1 | `rg-ecommercestore-dev` |
 | Container Apps environment | 1 | Consumption; Azure-managed network; live logs only |
-| Container Apps | Up to 4 | Products, BFF, Web, Users; public HTTPS; 0–1 replicas each |
+| Container Apps | Up to 5 | Products, BFF, Web, Users, Orders/Invoices; public HTTPS; 0–1 replicas each |
 | SQL logical server | 1 | Password authentication; public endpoint |
 | SQL database | 1 | `products`; Free offer; serverless; pause at monthly free limit |
 | DocumentDB cluster | 1 | MongoDB-compatible; Free; 32 GB; no HA |
-| Photo storage account | 1 | Standard LRS / Hot |
+| Blob storage account | 1 | Existing photo account; Standard LRS / Hot |
 | Photo container | 1 | `photos`; anonymous blob reads; authenticated writes |
+| Invoice container | 1 | `invoices`; private; application uploads/downloads |
 
-This is **11 core resources with all four apps enabled**, plus two required database
-firewall rules: **13 Terraform resource instances**. The rules allow Azure services
+This is **13 core resources with all five apps enabled**, plus two required database
+firewall rules: **15 Terraform resource instances**. The rules allow Azure services
 to attempt connections, including other subscriptions; database authentication is
 still required. There are no Internet-wide database firewall rules or outbound IP scripts.
 
 | Apps in `app_images` | Resources on a fresh deployment |
 | --- | ---: |
-| None — first apply | 9 |
-| Products | 10 |
-| Products + BFF | 11 |
-| Products + BFF + Web | 12 |
-| All four, including Users | 13 |
+| None — first apply | 10 |
+| Products | 11 |
+| Products + BFF | 12 |
+| Products + BFF + Web | 13 |
+| Products + BFF + Web + Users | 14 |
+| All five, including Orders/Invoices | 15 |
 
 Counts exclude provider registrations, Azure-managed supporting resources and the
 existing state storage. Resource names and passwords stay stable between runs.
+The invoice container is part of the foundation even while Orders is disabled.
+An existing four-app store created before this addition has 13 instances; creating
+the invoice container adds one, and enabling Orders adds the fifteenth.
 
 ## 1. Prepare
 
@@ -94,7 +99,7 @@ terraform plan "-out=deploy.tfplan"
 Run the commands one at a time and stop if one fails. In PowerShell, quote the whole
 `"-out=deploy.tfplan"` argument to keep it as one native command-line argument.
 
-Review: expect **9 additions**, no deletion or migration of old infrastructure.
+Review: expect **10 additions**, no deletion or migration of old infrastructure.
 Apply the reviewed plan:
 
 ```powershell
@@ -507,6 +512,142 @@ transaction. These commands have not been executed against your Azure cluster he
 they verify a successful create/read when you run them. Direct inspection of
 current/history documents and forced-failure rollback remain separate hosted-database
 checks; passing native MongoDB CI alone does not prove those Azure behaviors.
+
+## 8. Prepare Orders / Invoices
+
+The application repository is
+[ECommerceStoreInvoice](https://github.com/MichalBoczula/ECommerceStoreInvoice).
+Its Terraform app key is `orders`; its ACA name is `ca-ecommercestore-orders-dev`.
+This root adds one private Blob container in the existing photo storage account and
+supports one additional ACA. It reuses the existing DocumentDB cluster, firewall
+rule and Consumption environment. There is no new Mongo cluster or storage account.
+
+### Prepare the private container now
+
+Keep your existing four entries in `app_images`, database passwords and Docker Hub
+token. Pull this change and run each command separately:
+
+```powershell
+git pull --ff-only
+terraform fmt -check
+terraform validate
+terraform plan "-out=invoice-storage.tfplan"
+```
+
+For the existing four-app deployment before this addition, expect **1 to add, 0 to
+change, 0 to destroy**: `azurerm_storage_container.invoices`. The BFF Orders
+destination is only added when `orders` is enabled, so this preparation does not
+change or restart the existing apps. Review and apply:
+
+```powershell
+terraform apply invoice-storage.tfplan
+terraform output invoice_storage_account_name
+terraform output invoice_container_name
+```
+
+The account remains `stecproductsdevmb261013` unless you already changed its name;
+the new container is `invoices`. Its access type is `private`, independently of the
+public `photos` container. Connection strings are supplied to ACA as secrets and
+are not exposed as Terraform outputs. State and saved plans still contain secrets.
+
+### Required application work before enabling Orders
+
+As reviewed on 2026-10-25, Invoice master commit
+`76512ccf8c521cf3151830312acc5b82d2e31792` has a
+[successful publishing run](https://github.com/MichalBoczula/ECommerceStoreInvoice/actions/runs/36797439907),
+but that image still writes local PDFs with `file://` URLs. It has no Blob adapter
+or PDF download endpoint, and its readiness check requires a replica-set name
+instead of also accepting the DocumentDB router topology supported by Users.
+Do not enable that image or its `latest` tag as a completed Azure invoice deployment.
+
+Publish a new image after the application:
+
+- Supports DocumentDB readiness while retaining session and writable-primary/router
+  checks, and initializes its collections/indexes in the separate database.
+- Reads `InvoiceStorage:ConnectionString` and `InvoiceStorage:ContainerName`, uploads
+  PDFs to Blob through the SDK, and preserves the existing invoice reservation,
+  completion and failed-attempt cleanup behavior. Terraform cannot make local files
+  durable merely by creating a Blob container.
+- Uses the Chromium installed in its image instead of running browser installation
+  during invoice requests, and provides the intended API download path for private
+  PDFs. The current Web image displays invoice metadata; its download action also
+  needs application work before browser downloads can be claimed to work.
+
+These application changes are prerequisites, not functionality implemented by this
+Terraform root. No Orders image is selected by default, and this guide intentionally
+does not provide an old digest or a placeholder image to deploy.
+
+### Enable the published application
+
+After those updates pass the app's existing CI and a compatible image is published,
+add an `orders` entry inside your existing `app_images` map using that image's
+immutable reference from `docker.io/mb0101/ecommerce-store-invoice-api`. Keep the
+Products, BFF, Web and Users entries. Do not create a second map or replace your
+current variables file with the example.
+
+The container contract is:
+
+| Setting | Value |
+| --- | --- |
+| Runtime | Production; HTTP port 8080; ACA terminates public HTTPS |
+| Forwarded headers | `ASPNETCORE_FORWARDEDHEADERS_ENABLED=true` for the proxy scheme |
+| Mongo connection | `MongoDbSettings__ConnectionString`, secret; same password-stable URI as Users |
+| Mongo database | `MongoDbSettings__DatabaseName=ecommerce-store-invoice-db` |
+| Products API | `ExternalServices__ProductCatalog__BaseUrl`, existing Products HTTPS URL |
+| Blob connection | `InvoiceStorage__ConnectionString`, secret from the existing storage account |
+| Blob container | `InvoiceStorage__ContainerName=invoices` |
+| Probes | `/health/live` for startup/liveness; `/health/ready` for readiness |
+| Resources | 0.5 vCPU / 1 GiB for Chromium; 0–1 replicas |
+
+The local name `users_connection_string` is reused for the shared cluster credentials;
+the database selection stays separate through each application's configuration.
+The Terraform database and account addresses are retained, so no existing data is
+moved or recreated. The other apps keep their 0.25 vCPU / 0.5 GiB allocation.
+
+When `orders` is enabled, Terraform sets
+`ReverseProxy__Clusters__orders-cluster__Destinations__destination1__Address` on BFF
+to the Orders HTTPS URL. The deployed BFF already routes `/shopping-carts`, `/orders`,
+`/invoices`, `/client-data-versions`, `/orders-documentation` and the Orders OpenAPI
+document. Web already forwards `/backend` to BFF; no new BFF routes or Web proxy
+settings are needed for these existing API calls.
+
+```powershell
+terraform validate
+terraform plan "-out=orders.tfplan"
+```
+
+After the private container preparation above, expect **1 to add, 1 to change, 0 to
+destroy**: the Orders ACA is created and BFF gains its destination. If the container
+has not yet been created, expect **2 to add, 1 to change, 0 to destroy** instead.
+Stop and inspect any other changes, especially password rotations or replacements.
+
+```powershell
+terraform apply orders.tfplan
+```
+
+### Verify the deployed application
+
+If you deactivated existing ACA revisions overnight, reactivate them before these
+checks. Warm Products/SQL first, then verify Orders readiness and its OpenAPI through
+Web/BFF:
+
+```powershell
+$appUrls = terraform output -json app_urls | ConvertFrom-Json
+Invoke-RestMethod "$($appUrls.products)/health/ready" -TimeoutSec 180
+Invoke-RestMethod "$($appUrls.orders)/health/ready" -TimeoutSec 180
+$ordersApi = Invoke-RestMethod "$($appUrls.web)/backend/api/orders/swagger/v1/swagger.json" -TimeoutSec 180
+$ordersApi.info.title
+Start-Process "$($appUrls.bff)/scalar/orders"
+```
+
+Readiness and OpenAPI do not prove checkout or PDF storage. Verify a cart-to-order
+transaction, paid-order invoice generation, Blob persistence and download through
+Web/BFF. After restarting the Orders revision, download the same invoice again to
+verify it survives container replacement. Keep current/history/snapshot consistency,
+unique invoice reservation and failure rollback checks in the application suites.
+Payments is a separate deployment; use the existing order status API for a demo
+Paid transition until the payment service is deployed. These Azure checks must be
+performed after the compatible image is available; they have not been run here.
 
 ## Cleanup
 

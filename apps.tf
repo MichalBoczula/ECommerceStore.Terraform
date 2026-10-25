@@ -19,13 +19,18 @@ locals {
       port       = 8080
       live_path  = "/health"
       ready_path = "/health"
-      env = {
-        ASPNETCORE_ENVIRONMENT                                                        = "Production"
-        ASPNETCORE_HTTP_PORTS                                                         = "8080"
-        GatewaySettings__BaseUrl                                                      = "http://localhost:8080"
-        ReverseProxy__Clusters__products-cluster__Destinations__destination1__Address = local.app_urls.products
-        ReverseProxy__Clusters__users-cluster__Destinations__destination1__Address    = local.app_urls.users
-      }
+      env = merge(
+        {
+          ASPNETCORE_ENVIRONMENT                                                        = "Production"
+          ASPNETCORE_HTTP_PORTS                                                         = "8080"
+          GatewaySettings__BaseUrl                                                      = "http://localhost:8080"
+          ReverseProxy__Clusters__products-cluster__Destinations__destination1__Address = local.app_urls.products
+          ReverseProxy__Clusters__users-cluster__Destinations__destination1__Address    = local.app_urls.users
+        },
+        contains(keys(var.app_images), "orders") ? {
+          ReverseProxy__Clusters__orders-cluster__Destinations__destination1__Address = local.app_urls.orders
+        } : {},
+      )
       secrets    = {}
       secret_env = {}
     }
@@ -51,6 +56,27 @@ locals {
         "database-connection" = local.users_connection_string
       }
       secret_env = { MongoDbSettings__ConnectionString = "database-connection" }
+    }
+    orders = {
+      port       = 8080
+      live_path  = "/health/live"
+      ready_path = "/health/ready"
+      env = {
+        ASPNETCORE_ENVIRONMENT                    = "Production"
+        ASPNETCORE_HTTP_PORTS                     = "8080"
+        ASPNETCORE_FORWARDEDHEADERS_ENABLED       = "true"
+        MongoDbSettings__DatabaseName             = "ecommerce-store-invoice-db"
+        ExternalServices__ProductCatalog__BaseUrl = local.app_urls.products
+        InvoiceStorage__ContainerName             = azurerm_storage_container.invoices.name
+      }
+      secrets = {
+        "database-connection"        = local.users_connection_string
+        "invoice-storage-connection" = azurerm_storage_account.photos.primary_connection_string
+      }
+      secret_env = {
+        MongoDbSettings__ConnectionString = "database-connection"
+        InvoiceStorage__ConnectionString  = "invoice-storage-connection"
+      }
     }
   }
 }
@@ -112,10 +138,11 @@ resource "azurerm_container_app" "app" {
     }
 
     container {
-      name   = each.key
-      image  = each.value
-      cpu    = 0.25
-      memory = "0.5Gi"
+      name  = each.key
+      image = each.value
+      # Orders renders PDFs with Chromium; the other apps keep their allocation.
+      cpu    = each.key == "orders" ? 0.5 : 0.25
+      memory = each.key == "orders" ? "1Gi" : "0.5Gi"
 
       dynamic "env" {
         for_each = local.app_config[each.key].env
@@ -174,6 +201,10 @@ resource "azurerm_container_app" "app" {
     precondition {
       condition     = each.key != "web" || contains(keys(var.app_images), "bff")
       error_message = "Keep the BFF image when adding Web."
+    }
+    precondition {
+      condition     = each.key != "orders" || contains(keys(var.app_images), "products")
+      error_message = "Keep the products image when adding Orders; checkout needs ProductsCatalog."
     }
   }
 }

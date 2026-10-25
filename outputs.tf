@@ -10,6 +10,14 @@ output "photos_base_url" {
   value = "${azurerm_storage_account.photos.primary_blob_endpoint}${azurerm_storage_container.photos.name}/"
 }
 
+output "invoice_storage_account_name" {
+  value = azurerm_storage_account.photos.name
+}
+
+output "invoice_container_name" {
+  value = azurerm_storage_container.invoices.name
+}
+
 output "sql_server_name" {
   value = azurerm_mssql_server.products.name
 }

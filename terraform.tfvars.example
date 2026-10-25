@@ -3,6 +3,10 @@ subscription_id = "fcbf086b-8ce4-4ca5-a3d7-0c56489e25f6"
 # Start with the shared infrastructure. Add real apps in subsequent applies.
 app_images = {}
 
+# Keep existing app entries when adding a service. The optional orders entry uses
+# mb0101/ecommerce-store-invoice-api at an immutable digest AFTER its DocumentDB
+# readiness and Blob PDF storage updates are published; see README section 8.
+
 # Non-secret registry username. Provide its read-only token through
 # TF_VAR_dockerhub_token in PowerShell; Terraform stores it as an ACA secret.
 dockerhub_username = "mb0101"

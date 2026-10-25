@@ -8,6 +8,7 @@ locals {
     bff      = "ca-ecommercestore-bff-dev"
     web      = "ca-ecommercestore-web-dev"
     users    = "ca-ecommercestore-users-dev"
+    orders   = "ca-ecommercestore-orders-dev"
   }
   app_urls = {
     for name, app_name in local.app_names :
