@@ -8,6 +8,8 @@ app_images = {}
 # section 8, with DocumentDB readiness and private Blob PDF storage support.
 # Add payments using the verified mb0101/ecommerce-store-payments-api digest in
 # README section 9. It reuses Mongo and requires the orders image to stay enabled.
+# Add livedocs using the verified mb0101/ecommerce-store-livedocs digest in README
+# section 10. CI will use the private livedocs container; the host serves its image.
 
 # Non-secret registry username. Provide its read-only token through
 # TF_VAR_dockerhub_token in PowerShell; Terraform stores it as an ACA secret.

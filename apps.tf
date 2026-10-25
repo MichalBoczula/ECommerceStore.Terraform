@@ -97,6 +97,16 @@ locals {
       }
       secret_env = { PAYMENTS_MONGODB_CONNECTION_STRING = "database-connection" }
     }
+    livedocs = {
+      port       = 8080
+      live_path  = "/health/live"
+      ready_path = "/health/ready"
+      # CI reads the private Blob archive and builds the static Allure site.
+      # The published Nginx image needs no runtime storage credentials or mount.
+      env        = {}
+      secrets    = {}
+      secret_env = {}
+    }
   }
 }
 

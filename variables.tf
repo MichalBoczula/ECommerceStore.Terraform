@@ -34,16 +34,16 @@ variable "mongo_admin_password" {
 }
 
 variable "app_images" {
-  description = "Apps to deploy, keyed by products, bff, web, users, orders or payments. Empty creates only the foundation. Keep existing entries when adding another service."
+  description = "Apps to deploy, keyed by products, bff, web, users, orders, payments or livedocs. Empty creates only the foundation. Keep existing entries when adding another service."
   type        = map(string)
   default     = {}
 
   validation {
     condition = alltrue([
       for name, image in var.app_images :
-      contains(["products", "bff", "web", "users", "orders", "payments"], name) && length(trimspace(image)) > 0
+      contains(["products", "bff", "web", "users", "orders", "payments", "livedocs"], name) && length(trimspace(image)) > 0
     ])
-    error_message = "Use only products, bff, web, users, orders and payments keys with non-empty image references."
+    error_message = "Use only products, bff, web, users, orders, payments and livedocs keys with non-empty image references."
   }
 }
 

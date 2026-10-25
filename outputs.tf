@@ -18,6 +18,14 @@ output "invoice_container_name" {
   value = azurerm_storage_container.invoices.name
 }
 
+output "livedocs_storage_account_name" {
+  value = azurerm_storage_account.photos.name
+}
+
+output "livedocs_container_name" {
+  value = azurerm_storage_container.livedocs.name
+}
+
 output "sql_server_name" {
   value = azurerm_mssql_server.products.name
 }

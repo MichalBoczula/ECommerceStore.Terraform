@@ -13,35 +13,37 @@ is no automatic fallback to a paid database tier.
 | --- | ---: | --- |
 | Resource group | 1 | `rg-ecommercestore-dev` |
 | Container Apps environment | 1 | Consumption; Azure-managed network; live logs only |
-| Container Apps | Up to 6 | Products, BFF, Web, Users, Orders/Invoices, Payments; public HTTPS; 0–1 replicas each |
+| Container Apps | Up to 7 | Products, BFF, Web, Users, Orders/Invoices, Payments, LiveDocs; public HTTPS; 0–1 replicas each |
 | SQL logical server | 1 | Password authentication; public endpoint |
 | SQL database | 1 | `products`; Free offer; serverless; pause at monthly free limit |
 | DocumentDB cluster | 1 | MongoDB-compatible; Free; 32 GB; no HA |
 | Blob storage account | 1 | Existing photo account; Standard LRS / Hot |
 | Photo container | 1 | `photos`; anonymous blob reads; authenticated writes |
 | Invoice container | 1 | `invoices`; private; application uploads/downloads |
+| Documentation container | 1 | `livedocs`; private; source bundles for later CI integration |
 
-This is **14 core resources with all six apps enabled**, plus two required database
-firewall rules: **16 Terraform resource instances**. The rules allow Azure services
+This is **16 core resources with all seven apps enabled**, plus two required database
+firewall rules: **18 Terraform resource instances**. The rules allow Azure services
 to attempt connections, including other subscriptions; database authentication is
 still required. There are no Internet-wide database firewall rules or outbound IP scripts.
 
 | Apps in `app_images` | Resources on a fresh deployment |
 | --- | ---: |
-| None — first apply | 10 |
-| Products | 11 |
-| Products + BFF | 12 |
-| Products + BFF + Web | 13 |
-| Products + BFF + Web + Users | 14 |
-| Products + BFF + Web + Users + Orders/Invoices | 15 |
-| All six, including Payments | 16 |
+| None — first apply | 11 |
+| Products | 12 |
+| Products + BFF | 13 |
+| Products + BFF + Web | 14 |
+| Products + BFF + Web + Users | 15 |
+| Products + BFF + Web + Users + Orders/Invoices | 16 |
+| All six store apps, including Payments | 17 |
+| All seven, including LiveDocs | 18 |
 
 Counts exclude provider registrations, Azure-managed supporting resources and the
 existing state storage. Resource names and passwords stay stable between runs.
-The invoice container is part of the foundation even while Orders is disabled.
-An existing four-app store created before this addition has 13 instances; creating
-the invoice container adds one, enabling Orders adds the fifteenth, and enabling
-Payments adds the sixteenth.
+The invoice and LiveDocs containers are part of the foundation even while their
+apps are disabled. The six-app store before the LiveDocs addition has 16 instances;
+adding the documentation container and host takes that existing deployment to 18.
+Plans upgrading older states also create any missing foundation containers.
 
 ## 1. Prepare
 
@@ -101,7 +103,7 @@ terraform plan "-out=deploy.tfplan"
 Run the commands one at a time and stop if one fails. In PowerShell, quote the whole
 `"-out=deploy.tfplan"` argument to keep it as one native command-line argument.
 
-Review: expect **10 additions**, no deletion or migration of old infrastructure.
+Review: expect **11 additions**, no deletion or migration of old infrastructure.
 Apply the reviewed plan:
 
 ```powershell
@@ -536,8 +538,10 @@ terraform validate
 terraform plan "-out=invoice-storage.tfplan"
 ```
 
-For the existing four-app deployment before this addition, expect **1 to add, 0 to
-change, 0 to destroy**: `azurerm_storage_container.invoices`. The BFF Orders
+For an older four-app deployment missing both private containers, expect **2 to add,
+0 to change, 0 to destroy**: `azurerm_storage_container.invoices` and
+`azurerm_storage_container.livedocs`. If LiveDocs storage already exists in this
+state, only the invoice container is added. The BFF Orders
 destination is only added when `orders` is enabled, so this preparation does not
 change or restart the existing apps. Review and apply:
 
@@ -614,8 +618,8 @@ terraform plan "-out=orders.tfplan"
 ```
 
 After the private container preparation above, expect **1 to add, 1 to change, 0 to
-destroy**: the Orders ACA is created and BFF gains its destination. If the container
-has not yet been created, expect **2 to add, 1 to change, 0 to destroy** instead.
+destroy**: the Orders ACA is created and BFF gains its destination. The plan also
+adds any missing foundation containers (`invoices` or `livedocs`).
 Stop and inspect any other changes, especially password rotations or replacements.
 
 ```powershell
@@ -767,10 +771,11 @@ terraform validate
 terraform plan "-out=payments.tfplan"
 ```
 
-With the previous five apps and invoice container applied, expect **1 to add, 1 to
+With the previous five apps and current foundation applied, expect **1 to add, 1 to
 change, 0 to destroy**: `azurerm_container_app.app["payments"]` is created, and BFF
 gains its Payments destination. Review any other changes before applying; retain
-the existing database passwords to avoid a rotation.
+the existing database passwords to avoid a rotation. An older state also gains the
+LiveDocs archive container if it has not been created yet.
 
 ```powershell
 terraform apply payments.tfplan
@@ -836,6 +841,121 @@ order → invoice** additionally needs the app's
 using the same image and Mongo/Orders settings. That job and Stripe runtime secrets
 are outside this one-ACA Pay/Get step. Browser success navigation and API readiness
 alone do not establish completed payment or invoice delivery.
+
+## 10. Deploy the empty LiveDocs portal
+
+The [LiveDocs repo](https://github.com/MichalBoczula/ECommerceStore.LiveDocs) already
+publishes a stateless documentation image. It runs non-root Nginx on port 8080 and
+serves Allure HTML generated during its image build. Its production manifest currently
+contains development `v1` with no published projects, which is suitable for the first
+empty deployment.
+
+This step adds **one ACA and one private `livedocs` Blob container**, using the existing
+resource group, ACA environment and photo storage account. The app uses 0.25 vCPU /
+0.5 GiB and 0–1 replicas. It has independent startup/liveness and readiness probes,
+needs no database, and is accessed directly at `/livedoc/` without a BFF route.
+
+### Blob storage and the running container
+
+The private container is an archive for source bundles: raw Allure results, feature
+files, OpenAPI and other documentation inputs. Future CI will upload these bundles,
+then LiveDocs will read selected bundles during its build and publish a new image.
+Deploying that new digest updates the site.
+
+The existing image does not read Blob at runtime. Its
+[container contract](https://github.com/MichalBoczula/ECommerceStore.LiveDocs/blob/main/docs/container-contract.md)
+requires no storage connection string, Azure identity or volume mount. Adding a
+runtime Blob secret would not make uploads appear in this image. The empty host can
+start while the archive is empty; upload permissions, service CI changes, manifest
+imports and the first generated report are the next integration step.
+
+For this rebuilt store, these new resources belong only to this consolidated root.
+The application docs still describe the older split `ECommerceStore.LiveDocs.Terraform`
+setup; do not apply those old roots to manage this deployment. Existing archives in
+other accounts/states are neither imported nor deleted by this change. Retain their
+data and URLs until an explicit migration if they contain documentation to keep.
+
+### Select the image and deploy
+
+Keep all six working store entries in your existing `app_images` map. Add this line
+inside that same map in your ignored `terraform.tfvars`:
+
+```hcl
+  livedocs = "docker.io/mb0101/ecommerce-store-livedocs@sha256:91900df0a9a350eda089a267d6d9ed2a66ede6ff8313582fa14f594e481bd150"
+```
+
+The selected Linux/amd64 image comes from LiveDocs commit
+`05d5e0e5420dd7452fb4c44be42e9b875ef88615`. Its
+[main CI run](https://github.com/MichalBoczula/ECommerceStore.LiveDocs/actions/runs/39662767571)
+passed the source/build, assembly, hosting and real Allure documentation checks,
+dependency audit, secret scan, quality gate, production container smoke test, image
+scan and publication. Docker Hub's full-commit tag resolved to this digest when
+checked on 2026-10-25. No application image rebuild is needed for the empty portal.
+
+Keep the same database passwords and Docker Hub pull token in your current shell.
+Run each command separately and stop on an error:
+
+```powershell
+git pull --ff-only
+terraform fmt -check
+terraform validate
+terraform plan "-out=livedocs.tfplan"
+```
+
+From the already-deployed six-app store before this change, expect **2 to add, 0 to
+change, 0 to destroy**: `azurerm_storage_container.livedocs` and
+`azurerm_container_app.app["livedocs"]`. Existing applications and BFF need no update.
+If the archive container has already been created by this state, only the ACA is
+added. After reviewing the plan:
+
+```powershell
+terraform apply livedocs.tfplan
+```
+
+### Verify the site and archive
+
+```powershell
+$appUrls = terraform output -json app_urls | ConvertFrom-Json
+$liveDocsUrl = $appUrls.livedocs
+Invoke-RestMethod "$liveDocsUrl/health/live" -TimeoutSec 180
+Invoke-RestMethod "$liveDocsUrl/health/ready" -TimeoutSec 180
+$build = Invoke-RestMethod "$liveDocsUrl/build-info.json" -TimeoutSec 180
+$build.commitSha -eq '05d5e0e5420dd7452fb4c44be42e9b875ef88615'
+Invoke-RestMethod "$liveDocsUrl/livedoc/catalog.json" -TimeoutSec 180 | ConvertTo-Json -Depth 8
+Start-Process "$liveDocsUrl/livedoc/"
+```
+
+Both health routes should return HTTP 200, and the source commit comparison should
+return `True`. The portal should open with an empty development v1. There are no
+service Allure reports until the first real bundle is imported and a new image is
+deployed. Readiness means the documentation host's site marker exists; it does not
+mean service tests passed or the application APIs are healthy.
+
+Check the storage target for the later CI integration:
+
+```powershell
+$archiveAccount = terraform output -raw livedocs_storage_account_name
+$archiveContainer = terraform output -raw livedocs_container_name
+az storage container show --account-name $archiveAccount --name $archiveContainer --query "{name:name,publicAccess:properties.publicAccess}" --output json
+```
+
+Expect account `stecproductsdevmb261013`, container `livedocs`, and no public access
+(`publicAccess` is null). Azure CLI uses the signed-in user's management access to
+obtain the account key, as with the existing photo upload commands; no key is printed
+or committed. The source archive is private even though the generated site is public.
+Its connection credentials are not Terraform outputs or runtime settings.
+
+These Azure checks must be run after your apply; they have not been executed here.
+If the app fails, inspect its console logs:
+
+```powershell
+az containerapp logs show --name ca-ecommercestore-livedocs-dev --resource-group rg-ecommercestore-dev --type console --tail 100 --format text
+```
+
+The archive container remains when the optional LiveDocs image entry is removed.
+Removing that entry deletes the ACA; leave it present for normal scale-to-zero.
+A full destroy of this root also deletes the shared account and documentation archive,
+so retain needed bundles before deliberately destroying the complete store.
 
 ## Cleanup
 
