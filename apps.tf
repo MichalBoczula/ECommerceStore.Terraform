@@ -30,6 +30,9 @@ locals {
         contains(keys(var.app_images), "orders") ? {
           ReverseProxy__Clusters__orders-cluster__Destinations__destination1__Address = local.app_urls.orders
         } : {},
+        contains(keys(var.app_images), "payments") ? {
+          ReverseProxy__Clusters__payments-cluster__Destinations__destination1__Address = local.app_urls.payments
+        } : {},
       )
       secrets    = {}
       secret_env = {}
@@ -77,6 +80,22 @@ locals {
         MongoDbSettings__ConnectionString = "database-connection"
         InvoiceStorage__ConnectionString  = "invoice-storage-connection"
       }
+    }
+    payments = {
+      port       = 8080
+      live_path  = "/health/live"
+      ready_path = "/health/ready"
+      env = {
+        PAYMENTS_ENVIRONMENT                = "production"
+        PAYMENTS_MONGODB_DATABASE_NAME      = "ecommerce-store-payments-db"
+        PAYMENTS_ORDERS_API_BASE_URL        = local.app_urls.orders
+        PAYMENTS_ORDERS_API_TIMEOUT_SECONDS = "30"
+        PAYMENTS_STRIPE_ENABLED             = "false"
+      }
+      secrets = {
+        "database-connection" = local.users_connection_string
+      }
+      secret_env = { PAYMENTS_MONGODB_CONNECTION_STRING = "database-connection" }
     }
   }
 }
@@ -205,6 +224,10 @@ resource "azurerm_container_app" "app" {
     precondition {
       condition     = each.key != "orders" || contains(keys(var.app_images), "products")
       error_message = "Keep the products image when adding Orders; checkout needs ProductsCatalog."
+    }
+    precondition {
+      condition     = each.key != "payments" || contains(keys(var.app_images), "orders")
+      error_message = "Keep the orders image when adding Payments; payment creation needs the Orders API."
     }
   }
 }

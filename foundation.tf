@@ -9,6 +9,7 @@ locals {
     web      = "ca-ecommercestore-web-dev"
     users    = "ca-ecommercestore-users-dev"
     orders   = "ca-ecommercestore-orders-dev"
+    payments = "ca-ecommercestore-payments-dev"
   }
   app_urls = {
     for name, app_name in local.app_names :

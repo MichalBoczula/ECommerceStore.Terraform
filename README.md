@@ -13,7 +13,7 @@ is no automatic fallback to a paid database tier.
 | --- | ---: | --- |
 | Resource group | 1 | `rg-ecommercestore-dev` |
 | Container Apps environment | 1 | Consumption; Azure-managed network; live logs only |
-| Container Apps | Up to 5 | Products, BFF, Web, Users, Orders/Invoices; public HTTPS; 0–1 replicas each |
+| Container Apps | Up to 6 | Products, BFF, Web, Users, Orders/Invoices, Payments; public HTTPS; 0–1 replicas each |
 | SQL logical server | 1 | Password authentication; public endpoint |
 | SQL database | 1 | `products`; Free offer; serverless; pause at monthly free limit |
 | DocumentDB cluster | 1 | MongoDB-compatible; Free; 32 GB; no HA |
@@ -21,8 +21,8 @@ is no automatic fallback to a paid database tier.
 | Photo container | 1 | `photos`; anonymous blob reads; authenticated writes |
 | Invoice container | 1 | `invoices`; private; application uploads/downloads |
 
-This is **13 core resources with all five apps enabled**, plus two required database
-firewall rules: **15 Terraform resource instances**. The rules allow Azure services
+This is **14 core resources with all six apps enabled**, plus two required database
+firewall rules: **16 Terraform resource instances**. The rules allow Azure services
 to attempt connections, including other subscriptions; database authentication is
 still required. There are no Internet-wide database firewall rules or outbound IP scripts.
 
@@ -33,13 +33,15 @@ still required. There are no Internet-wide database firewall rules or outbound I
 | Products + BFF | 12 |
 | Products + BFF + Web | 13 |
 | Products + BFF + Web + Users | 14 |
-| All five, including Orders/Invoices | 15 |
+| Products + BFF + Web + Users + Orders/Invoices | 15 |
+| All six, including Payments | 16 |
 
 Counts exclude provider registrations, Azure-managed supporting resources and the
 existing state storage. Resource names and passwords stay stable between runs.
 The invoice container is part of the foundation even while Orders is disabled.
 An existing four-app store created before this addition has 13 instances; creating
-the invoice container adds one, and enabling Orders adds the fifteenth.
+the invoice container adds one, enabling Orders adds the fifteenth, and enabling
+Payments adds the sixteenth.
 
 ## 1. Prepare
 
@@ -656,9 +658,10 @@ transaction, paid-order invoice generation, Blob persistence and download throug
 Web/BFF. After restarting the Orders revision, download the same invoice again to
 verify it survives container replacement. Keep current/history/snapshot consistency,
 unique invoice reservation and failure rollback checks in the application suites.
-Payments is a separate deployment; use the existing order status API for a demo
-Paid transition until the payment service is deployed. These Azure checks have not
-been run here. Readiness checks Mongo connectivity/topology; it does not test Blob
+Use the existing order status API for a demo Paid transition. Deploying the Payments
+Pay/Get API alone does not confirm a Stripe payment or run invoice fulfillment;
+see section 9. These Azure checks have not been run here. Readiness checks Mongo
+connectivity/topology; it does not test Blob
 permissions or PDF rendering. Ambiguous failed generations can retain orphan Blobs;
 automatic orphan cleanup remains separate work.
 
@@ -667,7 +670,7 @@ automatic orphan cleanup remains separate work.
 After the readiness checks above succeed, run each command separately and stop on
 an error. This creates a demo client-data snapshot, one order and one invoice using
 a real seeded product. It leaves those records in Mongo and the PDF in Blob storage.
-The explicit `Paid` transition is a demo substitute for the undeployed payment service.
+The explicit `Paid` transition is a manual demo; it does not test Stripe or its worker.
 
 ```powershell
 $backend = "$($appUrls.web)/backend"
@@ -709,6 +712,130 @@ contain no SAS token. Open the downloaded PDF, then restart the Orders revision 
 Azure and repeat the last two commands. The same invoice must remain downloadable.
 These are hosted validation commands for you to run; CI tests use isolated native
 Mongo, Azurite and HTTP fixtures rather than your Azure data.
+
+## 9. Deploy Payments
+
+The [Payments app](https://github.com/MichalBoczula/ECommerceStorePayments) is FastAPI
+on Python 3.14, served by Uvicorn on port 8080. This step adds one Container App and
+connects it to the existing DocumentDB cluster and Orders API. The application creates
+its collections/indexes in the separate `ecommerce-store-payments-db` database.
+There is no Terraform Mongo database resource to add: startup initializes it.
+
+Keep all five existing entries in your `app_images` map and add this line inside
+that same map in your ignored `terraform.tfvars`:
+
+```hcl
+  payments = "docker.io/mb0101/ecommerce-store-payments-api@sha256:154d9900a42689ad84758f87b7f481257a4829835c51ebdcf48f34950f1a2c6b"
+```
+
+This Linux/amd64 image is published from Payments main commit
+`9663df14cb10886a32fa7850d1ca51537a3da009`. Its
+[CI run](https://github.com/MichalBoczula/ECommerceStorePayments/actions/runs/36810479764)
+passed source checks, all five suites, coverage, dependency audit, secret scan,
+container smoke, image scan and publication. The full-commit Docker Hub tag resolved
+to this digest when checked on 2026-10-25. No application source changes or image
+rebuild are needed for this API deployment.
+
+Terraform supplies:
+
+| Setting | Value |
+| --- | --- |
+| ACA name | `ca-ecommercestore-payments-dev` |
+| Runtime | `PAYMENTS_ENVIRONMENT=production`; port 8080; public HTTPS |
+| Mongo connection | `PAYMENTS_MONGODB_CONNECTION_STRING`, ACA secret; same cluster credentials as Users/Orders |
+| Mongo database | `PAYMENTS_MONGODB_DATABASE_NAME=ecommerce-store-payments-db` |
+| Orders URL | `PAYMENTS_ORDERS_API_BASE_URL`, existing Orders HTTPS URL |
+| Orders timeout | `PAYMENTS_ORDERS_API_TIMEOUT_SECONDS=30`, allowing for a cold replica |
+| Stripe baseline | `PAYMENTS_STRIPE_ENABLED=false`; Pay/Get remains available |
+| Probes | `/health/live` for startup/liveness; `/health/ready` for Mongo readiness |
+| Resources | 0.25 vCPU / 0.5 GiB; 0–1 replicas |
+
+The Payments entry requires `orders` to remain enabled. When Payments is enabled,
+Terraform adds its HTTPS destination to BFF's existing `payments-cluster`. The deployed
+BFF already forwards `/payments/...` and `/api/payments/openapi.json`; Web already
+forwards `/backend` to BFF. No BFF or Web image change is needed for these API routes.
+
+### Plan and apply
+
+Keep the same database passwords and working Docker Hub pull token in this shell.
+Run each command separately and stop on an error:
+
+```powershell
+git pull --ff-only
+terraform fmt -check
+terraform validate
+terraform plan "-out=payments.tfplan"
+```
+
+With the previous five apps and invoice container applied, expect **1 to add, 1 to
+change, 0 to destroy**: `azurerm_container_app.app["payments"]` is created, and BFF
+gains its Payments destination. Review any other changes before applying; retain
+the existing database passwords to avoid a rotation.
+
+```powershell
+terraform apply payments.tfplan
+```
+
+### Verify Mongo and Web/BFF routing
+
+```powershell
+$appUrls = terraform output -json app_urls | ConvertFrom-Json
+Invoke-RestMethod "$($appUrls.orders)/health/ready" -TimeoutSec 180
+Invoke-RestMethod "$($appUrls.payments)/health/ready" -TimeoutSec 180
+$paymentsApi = Invoke-RestMethod "$($appUrls.web)/backend/api/payments/openapi.json" -TimeoutSec 180
+$paymentsApi.info.title
+Start-Process "$($appUrls.payments)/swagger"
+Start-Process "$($appUrls.bff)/scalar/payments"
+```
+
+Payments readiness returns JSON with `status = healthy`; Orders returns `Healthy`.
+OpenAPI should identify the Payments API. Readiness probes Mongo only; it does not
+validate transactions, Orders, Stripe or invoice fulfillment. To exercise the real
+Orders lookup and Mongo create/read, choose a demo order still in `Created` state
+(the manually Paid order in section 8 is unsuitable), then run:
+
+```powershell
+$orderId = Read-Host 'Created demo order ID'
+$backend = "$($appUrls.web)/backend"
+$payment = Invoke-RestMethod "$backend/payments/$orderId/pay" -Method Post -TimeoutSec 180
+$savedPayment = Invoke-RestMethod "$backend/payments/order/$orderId" -TimeoutSec 180
+$payment.id -eq $savedPayment.id
+$savedPayment.status
+$repeatedPayment = Invoke-RestMethod "$backend/payments/$orderId/pay" -Method Post -TimeoutSec 180
+$repeatedPayment.id -eq $payment.id
+```
+
+For a fresh valid order, expect `True`, `created`, `True`. The first Pay returns 201;
+a repeat returns 200 with the same payment ID. This verifies **Web → BFF → Payments
+→ Orders and DocumentDB**. It reserves a payment; it does not charge or mark the
+order Paid. Native Mongo CI passed; these Azure runtime checks have not been run
+here. Transaction-backed retries, history writes and webhook updates still need
+hosted verification when enabling Stripe.
+
+If startup or readiness fails, inspect the Payments logs without printing secrets:
+
+```powershell
+az containerapp logs show --name ca-ecommercestore-payments-dev --resource-group rg-ecommercestore-dev --type console --tail 100 --format text
+```
+
+### Stripe checkout and invoice fulfillment are a separate deployment step
+
+This minimal API deployment deliberately follows the app's disabled Stripe baseline.
+`POST /payments/{order_id}/checkout` returns 503 `checkout_disabled` until test checkout
+is configured. The app requires a test API key, fixed frontend return URLs and an
+endpoint-specific webhook signing secret. GitHub Actions secrets do not automatically
+become ACA runtime settings. Register the Payments HTTPS webhook URL in Stripe test
+mode and follow the app's [checkout](https://github.com/MichalBoczula/ECommerceStorePayments/blob/main/docs/stripe-checkout.md)
+and [webhook](https://github.com/MichalBoczula/ECommerceStorePayments/blob/main/docs/stripe-webhooks.md)
+runbooks before enabling it.
+
+The API stores verified success and durable fulfillment work. It does not start the
+one-shot fulfillment worker in the background. Automatic **Succeeded payment → Paid
+order → invoice** additionally needs the app's
+[scheduled ACA Job](https://github.com/MichalBoczula/ECommerceStorePayments/blob/main/docs/payment-fulfillment.md),
+using the same image and Mongo/Orders settings. That job and Stripe runtime secrets
+are outside this one-ACA Pay/Get step. Browser success navigation and API readiness
+alone do not establish completed payment or invoice delivery.
 
 ## Cleanup
 
