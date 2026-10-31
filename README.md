@@ -968,3 +968,56 @@ terraform apply destroy.tfplan
 
 The independently managed `stecomtfstatemb261011/tfstate` backend remains. Cloning or
 validating this repository creates no Azure resources.
+
+
+## 11. Knowledge Assistant (optional)
+
+The developer tool has separate Python API and Angular repositories. It shares this
+root/state, resource group, storage archive and ACA environment. Additive settings
+default to disabled, so existing deployments retain their current resource set.
+
+First enable only `knowledge_search_enabled = true` in your existing variables file.
+A fresh plan should add one `azurerm_search_service.knowledge[0]`, using **Free** SKU.
+Free subscription capacity shortages fail; there is no fallback to paid Search.
+Keep all existing variables, passwords, Docker Hub token and app image entries.
+
+```bash
+terraform fmt -check
+terraform validate
+terraform plan -out=knowledge-search.tfplan
+# Apply only after reviewing the plan against your existing state.
+terraform apply knowledge-search.tfplan
+terraform output -raw knowledge_search_endpoint
+```
+
+The new service is named `srch-ecommercestore-knowledge-${name_suffix}`. Terraform
+registers `Microsoft.Search` when this option is enabled. The application owns the
+search index schema and data; index content is not embedded in Terraform state.
+Source ingestion uses the exact selected LiveDocs manifest, not the newest Blob.
+
+Model resources/deployments are intentionally supplied separately. Set
+`knowledge_models` to an existing Azure OpenAI v1 endpoint, chat/embedding deployment
+names and the chosen embedding dimensions. Model calls have separate usage charges.
+Provide `TF_VAR_knowledge_openai_api_key` and `TF_VAR_knowledge_api_key` securely.
+The latter is a shared 32–128 character alphanumeric/underscore/hyphen proxy key.
+Do not commit keys or put them in browser configuration.
+
+After indexing the selected corpus successfully, build the Python image with that
+corpus and publish both application images using the application repositories.
+Add their verified immutable references to existing `app_images` as `knowledge_api`
+and `knowledge_web`. Both hosts use port 8080 and 0–1 replicas. They add two Container
+Apps; the existing store/database resource ownership is unchanged.
+
+The Python API receives a read-only Search query key, model key and API key as ACA
+secrets. Indexing runs separately with a Search admin key or authorized identity.
+The Web Nginx proxy sends the API key server-side over the shared ACA environment's
+built-in app-name address. Browser assets contain no Search/model/API credentials.
+The API requires enabled Search and complete model/key settings. The Web host
+requires the API image. `/health/ready` proves local corpus/static readiness, not
+successful live Azure retrieval; test a sourced answer after deployment.
+
+Default application images contain labelled synthetic demonstration data. Build
+the deployed API image with the indexed `artifacts/active-corpus.json` as documented
+in `ECommerceStore.KnowledgeAssistant.Api`. Never advertise the demo corpus as the
+store's real business rules. Search storage statistics determine Free capacity;
+ZIP/archive sizes cannot be compared directly with its 50 MB limit.

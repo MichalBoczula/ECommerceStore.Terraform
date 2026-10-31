@@ -28,13 +28,13 @@ provider "azurerm" {
   use_cli         = true
 
   resource_provider_registrations = "none"
-  resource_providers_to_register = [
+  resource_providers_to_register = concat([
     "Microsoft.App",
     "Microsoft.DocumentDB",
     "Microsoft.Network",
     "Microsoft.Sql",
     "Microsoft.Storage",
-  ]
+  ], var.knowledge_search_enabled ? ["Microsoft.Search"] : [])
 
   features {}
 }
@@ -43,3 +43,4 @@ provider "azapi" {
   subscription_id = var.subscription_id
   use_cli         = true
 }
+

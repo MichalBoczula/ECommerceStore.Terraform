@@ -97,6 +97,42 @@ locals {
       }
       secret_env = { PAYMENTS_MONGODB_CONNECTION_STRING = "database-connection" }
     }
+    knowledge_api = {
+      port       = 8080
+      live_path  = "/health/live"
+      ready_path = "/health/ready"
+      env = {
+        KA_CORPUS_PATH          = "/app/data/corpus.json"
+        KA_RETRIEVAL_MODE       = "azure"
+        KA_GENERATION_MODE      = "azure"
+        KA_SEARCH_ENDPOINT      = try("https://${azurerm_search_service.knowledge[0].name}.search.windows.net", "")
+        KA_SEARCH_INDEX         = "knowledge-v1"
+        KA_OPENAI_ENDPOINT      = var.knowledge_models.endpoint
+        KA_EMBEDDING_DEPLOYMENT = var.knowledge_models.embedding_deployment
+        KA_EMBEDDING_DIMENSIONS = tostring(var.knowledge_models.embedding_dimensions)
+        KA_CHAT_DEPLOYMENT      = var.knowledge_models.chat_deployment
+      }
+      secrets = {
+        "knowledge-search-key" = try(azurerm_search_service.knowledge[0].query_keys[0].key, null)
+        "knowledge-openai-key" = var.knowledge_openai_api_key
+        "knowledge-api-key"    = var.knowledge_api_key
+      }
+      secret_env = {
+        KA_SEARCH_KEY = "knowledge-search-key"
+        KA_OPENAI_KEY = "knowledge-openai-key"
+        KA_API_KEY    = "knowledge-api-key"
+      }
+    }
+    knowledge_web = {
+      port       = 8080
+      live_path  = "/health/live"
+      ready_path = "/health/ready"
+      env = {
+        KNOWLEDGE_API_URL = "http://${local.app_names.knowledge_api}"
+      }
+      secrets    = { "knowledge-api-key" = var.knowledge_api_key }
+      secret_env = { KNOWLEDGE_API_KEY = "knowledge-api-key" }
+    }
     livedocs = {
       port       = 8080
       live_path  = "/health/live"
@@ -224,6 +260,20 @@ resource "azurerm_container_app" "app" {
 
   lifecycle {
     precondition {
+      condition = each.key != "knowledge_api" || (
+        var.knowledge_search_enabled &&
+        startswith(var.knowledge_models.endpoint, "https://") &&
+        length(var.knowledge_models.chat_deployment) > 0 &&
+        length(var.knowledge_models.embedding_deployment) > 0 &&
+        var.knowledge_openai_api_key != null && var.knowledge_api_key != null
+      )
+      error_message = "Knowledge API requires Free Search, existing model deployment settings, and server-side API keys."
+    }
+    precondition {
+      condition     = each.key != "knowledge_web" || (contains(keys(var.app_images), "knowledge_api") && var.knowledge_api_key != null)
+      error_message = "Knowledge Web requires the knowledge_api image and shared server-side API key."
+    }
+    precondition {
       condition     = each.key != "bff" || contains(keys(var.app_images), "products")
       error_message = "Keep the products image when adding BFF."
     }
@@ -241,3 +291,4 @@ resource "azurerm_container_app" "app" {
     }
   }
 }
+
