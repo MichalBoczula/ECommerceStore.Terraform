@@ -69,7 +69,68 @@ run "knowledge_hosts_use_valid_names" {
   }
 
   assert {
+    condition = alltrue([
+      for expected in [
+        { name = "KA_RETRIEVAL_MODE", value = "azure" },
+        { name = "KA_GENERATION_MODE", value = "azure" },
+        ] : anytrue([
+          for env in azurerm_container_app.app["knowledge_api"].template[0].container[0].env :
+          env.name == expected.name && env.value == expected.value
+      ])
+    ])
+    error_message = "The default Azure mode must retain hybrid retrieval and model generation."
+  }
+
+  assert {
     condition     = length(azurerm_search_service.knowledge) == 1 && azurerm_search_service.knowledge[0].sku == "free"
     error_message = "Enabling Knowledge must retain the Free Search tier."
+  }
+}
+
+
+
+run "demo_hosts_work_without_search_or_models" {
+  command = plan
+
+  variables {
+    knowledge_runtime_mode = "demo"
+    knowledge_api_key      = "synthetic-test-key-0123456789abcdef"
+    app_images = {
+      knowledge_api = "example.invalid/knowledge-api@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      knowledge_web = "example.invalid/knowledge-web@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+  }
+
+  assert {
+    condition     = length(azurerm_container_app.app) == 2 && length(azurerm_search_service.knowledge) == 0
+    error_message = "Demo deployment must host both apps without requiring a Search service."
+  }
+
+  assert {
+    condition = alltrue([
+      for expected in [
+        { name = "KA_RETRIEVAL_MODE", value = "local" },
+        { name = "KA_GENERATION_MODE", value = "evidence" },
+        ] : anytrue([
+          for env in azurerm_container_app.app["knowledge_api"].template[0].container[0].env :
+          env.name == expected.name && env.value == expected.value
+      ])
+    ])
+    error_message = "Demo must use local retrieval and evidence extraction."
+  }
+
+  assert {
+    condition = toset([
+      for secret in azurerm_container_app.app["knowledge_api"].secret : secret.name
+    ]) == toset(["knowledge-api-key"])
+    error_message = "Demo API must retain proxy authentication without injecting Search or OpenAI keys."
+  }
+
+  assert {
+    condition = !anytrue([
+      for env in azurerm_container_app.app["knowledge_api"].template[0].container[0].env :
+      contains(["KA_SEARCH_KEY", "KA_OPENAI_KEY", "KA_OPENAI_ENDPOINT"], env.name)
+    ])
+    error_message = "Demo must not configure cloud-provider calls."
   }
 }
