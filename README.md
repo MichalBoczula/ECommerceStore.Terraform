@@ -1077,13 +1077,31 @@ configuration. Switch the demo deployment to Azure only after the following are 
 3. Supply `TF_VAR_knowledge_openai_api_key` securely and retain
    `TF_VAR_knowledge_api_key`. The API receives a read-only Search query key.
 4. Ingest the exact selected LiveDocs manifest, index the corpus with admin credentials
-   or an authorized identity, and verify every upload succeeded.
+   or an authorized identity, and verify every upload succeeded. The API repository's
+   `knowledge plan-index` command reviews chunk/cache counts without cloud calls;
+   `knowledge index` verifies the ingestion report and publishes a completion marker
+   only after every chunk is visible. Neither command deploys or changes active state.
 5. Build/publish a new API image containing that same real corpus, then update its
    immutable image reference and set `knowledge_runtime_mode = "azure"`.
 
 The currently published baseline image contains demo data. Merely switching modes
 does not replace that corpus with real business documentation. Application-owned
 ingestion and image publication must supply the matching real corpus first.
+
+`knowledge_search_index` defaults to `"knowledge-v1"`. Set it to the exact
+`KA_SEARCH_INDEX` used by the indexing operator. The application checks an existing
+index's schema before uploading; it refuses incompatible schemas instead of changing
+them in place. For an existing prototype index or a dimension/schema change, build a
+new compatible index under a new name, verify it, then deploy with that name. Old
+indexes remain until you deliberately remove them through the application tooling or
+Azure management. This variable does not create an index or increase Search capacity.
+
+`knowledge_embedding_revision` defaults to `"1"` and is passed as
+`KA_EMBEDDING_REVISION`. Match the indexing setting. Increment it if the model behind
+the same embedding deployment name changes; rebuild embeddings before deploying the
+new profile. Runtime uses the Search query key and requires no index-management
+client. Application caches and real corpus/report files do not belong in Terraform
+or its state. The existing backend configuration is unchanged.
 
 Terraform owns the Free Search service `srch-ecommercestore-knowledge-${var.name_suffix}`
 and registers `Microsoft.Search` when enabled. The application owns schemas/content;
@@ -1109,4 +1127,3 @@ Mocks do not prove Azure capacity, permissions or agreement with existing state.
 An authenticated plan in the normal deployment checkout is required before apply.
 After using `-backend=false` in a checkout, run `terraform init` before its normal
 deployment plan.
-

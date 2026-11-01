@@ -26,6 +26,26 @@ variable "knowledge_runtime_mode" {
   }
 }
 
+variable "knowledge_search_index" {
+  description = "Application-managed index selected for this corpus. Use a new name for incompatible schema or dimension changes."
+  type        = string
+  default     = "knowledge-v1"
+  validation {
+    condition     = length(var.knowledge_search_index) >= 2 && length(var.knowledge_search_index) <= 128 && can(regex("^[a-z0-9][a-z0-9-]*[a-z0-9]$", var.knowledge_search_index))
+    error_message = "Use a 2-128 character lowercase index name with letters, digits and internal hyphens."
+  }
+}
+
+variable "knowledge_embedding_revision" {
+  description = "Embedding profile revision. Increment when changing the model behind an existing deployment name; reindex before deploying the matching corpus/profile."
+  type        = string
+  default     = "1"
+  validation {
+    condition     = length(trimspace(var.knowledge_embedding_revision)) > 0 && length(var.knowledge_embedding_revision) <= 128
+    error_message = "Embedding revision must contain 1-128 characters."
+  }
+}
+
 variable "knowledge_models" {
   description = "Existing Azure OpenAI v1 endpoint and deployed model names. Model calls are billed separately from Free Search."
   type = object({
@@ -68,4 +88,3 @@ output "knowledge_search_endpoint" {
   description = "Null until Free Search is enabled."
   value       = try("https://${azurerm_search_service.knowledge[0].name}.search.windows.net", null)
 }
-
