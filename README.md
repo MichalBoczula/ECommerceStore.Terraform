@@ -1005,8 +1005,12 @@ Do not commit keys or put them in browser configuration.
 After indexing the selected corpus successfully, build the Python image with that
 corpus and publish both application images using the application repositories.
 Add their verified immutable references to existing `app_images` as `knowledge_api`
-and `knowledge_web`. Both hosts use port 8080 and 0–1 replicas. They add two Container
-Apps; the existing store/database resource ownership is unchanged.
+and `knowledge_web`. Both hosts use port 8080 and 0–1 replicas. The Azure app names
+are `ca-ecommercestore-ka-api-dev` and `ca-ecommercestore-ka-web-dev`, within Azure's
+32-character limit. Container names use `knowledge-api` and `knowledge-web`; the
+`app_images` keys remain `knowledge_api` / `knowledge_web`. The proxy derives its API
+address from the same app-name map. They add two Container Apps; the existing
+store/database resource ownership is unchanged.
 
 The Python API receives a read-only Search query key, model key and API key as ACA
 secrets. Indexing runs separately with a Search admin key or authorized identity.
@@ -1021,3 +1025,25 @@ the deployed API image with the indexed `artifacts/active-corpus.json` as docume
 in `ECommerceStore.KnowledgeAssistant.Api`. Never advertise the demo corpus as the
 store's real business rules. Search storage statistics determine Free capacity;
 ZIP/archive sizes cannot be compared directly with its 50 MB limit.
+
+
+
+### Validate Knowledge changes before deployment
+
+The Terraform checks workflow runs on pull requests and main pushes, with the pinned
+provider lock file and no Azure credentials. It checks formatting, validates the full
+configuration and runs two mocked plan tests for disabled defaults, Azure app/container
+naming, the Web-to-API address and the Free Search tier. Run the same checks locally:
+
+```bash
+terraform init -backend=false -input=false -lockfile=readonly
+terraform fmt -check -recursive
+terraform validate
+terraform test
+```
+
+Mocks do not prove Azure capacity, deployed permissions or agreement with existing
+state. Before merging or applying this infrastructure change, run an authenticated
+plan in your normal deployment checkout with its existing variables and backend.
+Review resource changes, replacements and deletions. If this checkout was initialized
+with `-backend=false`, run `terraform init` first to initialize its normal backend.

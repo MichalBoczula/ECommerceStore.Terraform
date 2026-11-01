@@ -203,7 +203,7 @@ resource "azurerm_container_app" "app" {
     }
 
     container {
-      name  = each.key
+      name  = replace(each.key, "_", "-")
       image = each.value
       # Orders renders PDFs with Chromium; the other apps keep their allocation.
       cpu    = each.key == "orders" ? 0.5 : 0.25
@@ -291,4 +291,5 @@ resource "azurerm_container_app" "app" {
     }
   }
 }
+
 
