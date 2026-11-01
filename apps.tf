@@ -101,27 +101,30 @@ locals {
       port       = 8080
       live_path  = "/health/live"
       ready_path = "/health/ready"
-      env = {
-        KA_CORPUS_PATH          = "/app/data/corpus.json"
-        KA_RETRIEVAL_MODE       = "azure"
-        KA_GENERATION_MODE      = "azure"
+      env = merge({
+        KA_CORPUS_PATH     = "/app/data/corpus.json"
+        KA_RETRIEVAL_MODE  = var.knowledge_runtime_mode == "demo" ? "local" : "azure"
+        KA_GENERATION_MODE = var.knowledge_runtime_mode == "demo" ? "evidence" : "azure"
+        }, var.knowledge_runtime_mode == "azure" ? {
         KA_SEARCH_ENDPOINT      = try("https://${azurerm_search_service.knowledge[0].name}.search.windows.net", "")
         KA_SEARCH_INDEX         = "knowledge-v1"
         KA_OPENAI_ENDPOINT      = var.knowledge_models.endpoint
         KA_EMBEDDING_DEPLOYMENT = var.knowledge_models.embedding_deployment
         KA_EMBEDDING_DIMENSIONS = tostring(var.knowledge_models.embedding_dimensions)
         KA_CHAT_DEPLOYMENT      = var.knowledge_models.chat_deployment
-      }
-      secrets = {
+      } : {})
+      secrets = merge({
+        "knowledge-api-key" = var.knowledge_api_key
+        }, var.knowledge_runtime_mode == "azure" ? {
         "knowledge-search-key" = try(azurerm_search_service.knowledge[0].query_keys[0].key, null)
         "knowledge-openai-key" = var.knowledge_openai_api_key
-        "knowledge-api-key"    = var.knowledge_api_key
-      }
-      secret_env = {
+      } : {})
+      secret_env = merge({
+        KA_API_KEY = "knowledge-api-key"
+        }, var.knowledge_runtime_mode == "azure" ? {
         KA_SEARCH_KEY = "knowledge-search-key"
         KA_OPENAI_KEY = "knowledge-openai-key"
-        KA_API_KEY    = "knowledge-api-key"
-      }
+      } : {})
     }
     knowledge_web = {
       port       = 8080
@@ -261,13 +264,17 @@ resource "azurerm_container_app" "app" {
   lifecycle {
     precondition {
       condition = each.key != "knowledge_api" || (
-        var.knowledge_search_enabled &&
-        startswith(var.knowledge_models.endpoint, "https://") &&
-        length(var.knowledge_models.chat_deployment) > 0 &&
-        length(var.knowledge_models.embedding_deployment) > 0 &&
-        var.knowledge_openai_api_key != null && var.knowledge_api_key != null
+        var.knowledge_api_key != null && (
+          var.knowledge_runtime_mode == "demo" || (
+            var.knowledge_search_enabled &&
+            startswith(var.knowledge_models.endpoint, "https://") &&
+            length(var.knowledge_models.chat_deployment) > 0 &&
+            length(var.knowledge_models.embedding_deployment) > 0 &&
+            var.knowledge_openai_api_key != null
+          )
+        )
       )
-      error_message = "Knowledge API requires Free Search, existing model deployment settings, and server-side API keys."
+      error_message = "Knowledge API requires a shared API key. Azure mode also requires Free Search and complete existing model/key settings."
     }
     precondition {
       condition     = each.key != "knowledge_web" || (contains(keys(var.app_images), "knowledge_api") && var.knowledge_api_key != null)
@@ -291,5 +298,6 @@ resource "azurerm_container_app" "app" {
     }
   }
 }
+
 
 

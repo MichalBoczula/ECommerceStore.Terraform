@@ -16,6 +16,16 @@ variable "knowledge_search_enabled" {
   default     = false
 }
 
+variable "knowledge_runtime_mode" {
+  description = "Azure uses indexed LiveDocs and configured models; demo uses the image's labelled synthetic corpus with local extraction."
+  type        = string
+  default     = "azure"
+  validation {
+    condition     = contains(["demo", "azure"], var.knowledge_runtime_mode)
+    error_message = "Knowledge runtime mode must be demo or azure."
+  }
+}
+
 variable "knowledge_models" {
   description = "Existing Azure OpenAI v1 endpoint and deployed model names. Model calls are billed separately from Free Search."
   type = object({
@@ -58,3 +68,4 @@ output "knowledge_search_endpoint" {
   description = "Null until Free Search is enabled."
   value       = try("https://${azurerm_search_service.knowledge[0].name}.search.windows.net", null)
 }
+

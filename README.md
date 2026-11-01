@@ -972,68 +972,131 @@ validating this repository creates no Azure resources.
 
 ## 11. Knowledge Assistant (optional)
 
-The developer tool has separate Python API and Angular repositories. It shares this
-root/state, resource group, storage archive and ACA environment. Additive settings
-default to disabled, so existing deployments retain their current resource set.
+The Python API and Angular Web share this root/state, resource group and ACA
+environment. `app_images` still controls which apps exist. New Knowledge resources
+remain disabled unless their image entries or Search option are explicitly enabled.
 
-First enable only `knowledge_search_enabled = true` in your existing variables file.
-A fresh plan should add one `azurerm_search_service.knowledge[0]`, using **Free** SKU.
-Free subscription capacity shortages fail; there is no fallback to paid Search.
-Keep all existing variables, passwords, Docker Hub token and app image entries.
+### First deployment: labelled demo
 
-```bash
-terraform fmt -check
-terraform validate
-terraform plan -out=knowledge-search.tfplan
-# Apply only after reviewing the plan against your existing state.
-terraform apply knowledge-search.tfplan
-terraform output -raw knowledge_search_endpoint
+The first published API image contains the synthetic demo corpus. Set
+`knowledge_runtime_mode = "demo"` to run local retrieval and evidence extraction.
+This brings up Web + API without Search or model calls. The shared proxy API key
+remains required. The UI displays its demonstration dataset and evidence mode.
+
+Add the following two entries **inside your existing `app_images` map** in your local
+deployment variables file. Keep every existing service entry and all existing SQL,
+Mongo, registry, location and naming settings. Do not replace the map with only these
+two entries or deploy from a new empty variables file.
+
+```hcl
+knowledge_api = "docker.io/mb0101/ecommerce-store-knowledge-assistant-api@sha256:bad557fa1c6ca89e7ac8af7e25dc48f0acac3f580740f185b0d1721ae0a75709"
+knowledge_web = "docker.io/mb0101/ecommerce-store-knowledge-assistant-web@sha256:e83f840ab6790e9dfde3e36f306b9f9f6dd7c4f686d55007fa24c8a85880b703"
 ```
 
-The new service is named `srch-ecommercestore-knowledge-${name_suffix}`. Terraform
-registers `Microsoft.Search` when this option is enabled. The application owns the
-search index schema and data; index content is not embedded in Terraform state.
-Source ingestion uses the exact selected LiveDocs manifest, not the newest Blob.
+Alongside that existing map, add:
 
-Model resources/deployments are intentionally supplied separately. Set
-`knowledge_models` to an existing Azure OpenAI v1 endpoint, chat/embedding deployment
-names and the chosen embedding dimensions. Model calls have separate usage charges.
-Provide `TF_VAR_knowledge_openai_api_key` and `TF_VAR_knowledge_api_key` securely.
-The latter is a shared 32–128 character alphanumeric/underscore/hyphen proxy key.
-Do not commit keys or put them in browser configuration.
+```hcl
+knowledge_runtime_mode = "demo"
+```
 
-After indexing the selected corpus successfully, build the Python image with that
-corpus and publish both application images using the application repositories.
-Add their verified immutable references to existing `app_images` as `knowledge_api`
-and `knowledge_web`. Both hosts use port 8080 and 0–1 replicas. The Azure app names
-are `ca-ecommercestore-ka-api-dev` and `ca-ecommercestore-ka-web-dev`, within Azure's
-32-character limit. Container names use `knowledge-api` and `knowledge-web`; the
-`app_images` keys remain `knowledge_api` / `knowledge_web`. The proxy derives its API
-address from the same app-name map. They add two Container Apps; the existing
-store/database resource ownership is unchanged.
+Keep your current `knowledge_search_enabled` value unless you intentionally want to
+create/delete Search. Demo does not require enabling Search. A new configuration
+defaults it to false; an already-created Free service can remain enabled.
 
-The Python API receives a read-only Search query key, model key and API key as ACA
-secrets. Indexing runs separately with a Search admin key or authorized identity.
-The Web Nginx proxy sends the API key server-side over the shared ACA environment's
-built-in app-name address. Browser assets contain no Search/model/API credentials.
-The API requires enabled Search and complete model/key settings. The Web host
-requires the API image. `/health/ready` proves local corpus/static readiness, not
-successful live Azure retrieval; test a sourced answer after deployment.
+These references were published by the successful application main pipelines:
 
-Default application images contain labelled synthetic demonstration data. Build
-the deployed API image with the indexed `artifacts/active-corpus.json` as documented
-in `ECommerceStore.KnowledgeAssistant.Api`. Never advertise the demo corpus as the
-store's real business rules. Search storage statistics determine Free capacity;
-ZIP/archive sizes cannot be compared directly with its 50 MB limit.
+- [API run 41323478853](https://github.com/MichalBoczula/ECommerceStore.KnowledgeAssistant.Api/actions/runs/41323478853),
+  source commit `37aa2e344ab0f2ebbd57c07b9c4b782cb6627d04`.
+- [Web run 41323487693](https://github.com/MichalBoczula/ECommerceStore.KnowledgeAssistant.Web/actions/runs/41323487693),
+  source commit `07cb356f24953d667ae44060d8d4293cb6f34825`.
 
+Both pipelines verified that their source-SHA and latest tags have matching digests.
+The `image-reference` workflow artifacts also contain these immutable references.
+Future image updates should use the reviewed artifacts from their successful main runs.
 
+Create a 32–128 character alphanumeric/underscore/hyphen proxy key in your password
+manager and retain it for subsequent plans. In Bash, load it without echoing it:
+
+```bash
+read -r -s -p "Knowledge API proxy key: " TF_VAR_knowledge_api_key
+printf '\n'
+export TF_VAR_knowledge_api_key
+```
+
+Keep the existing deployment's database passwords and Docker Hub pull token available
+as before. Registry push secrets in the application repositories are separate from
+Terraform's optional runtime pull token.
+
+From your normal Terraform deployment checkout, after updating to this version and
+editing its existing variables:
+
+```bash
+terraform init
+terraform fmt -check -recursive
+terraform validate
+terraform plan -out=knowledge-bootstrap.tfplan
+terraform show -no-color knowledge-bootstrap.tfplan
+# Review the plan before applying it.
+terraform apply knowledge-bootstrap.tfplan
+terraform output -json app_urls
+```
+
+The backend remains `stecomtfstatemb261011/tfstate`, key
+`ecommerce-store/simple-dev.terraform.tfstate`. Do not migrate or replace this state.
+The intended first demo addition is two Knowledge Container Apps. Review any other
+changes or replacements against your existing deployment before applying the plan.
+
+The Azure app names are `ca-ecommercestore-ka-api-dev` and
+`ca-ecommercestore-ka-web-dev`. They use port 8080 and 0–1 replicas, with the Web
+proxy's API address derived from the same app-name map. API keys stay in ACA secrets
+and the server proxy, outside browser assets.
+
+After deployment, verify the public Web proxy and its selected corpus:
+
+```bash
+knowledge_web_url="$(terraform output -json app_urls | jq -r '.knowledge_web')"
+curl --fail --silent --show-error --max-time 120 "$knowledge_web_url/health/ready"
+curl --fail --silent --show-error --max-time 120 "$knowledge_web_url/api/v1/catalog"
+```
+
+The catalog must report `isDemo: true`, `answerMode: evidence` and
+`retrievalMode: local_keyword`. Open the Web URL and use the mobile-phone example to
+verify validation, contract JSON and citations through the deployed API.
+`/health/ready` proves local corpus/static readiness, not Azure connectivity.
+
+### Connect real LiveDocs later
+
+`knowledge_runtime_mode` defaults to `azure` to preserve the existing Azure
+configuration. Switch the demo deployment to Azure only after the following are ready:
+
+1. Enable `knowledge_search_enabled = true` if Search has not been provisioned.
+   A plan should add one `azurerm_search_service.knowledge[0]` using **Free** SKU.
+   Free capacity shortages fail; there is no paid Search fallback.
+2. Configure `knowledge_models` with an existing Azure OpenAI v1 endpoint, deployed
+   chat/embedding names and matching embedding dimensions.
+3. Supply `TF_VAR_knowledge_openai_api_key` securely and retain
+   `TF_VAR_knowledge_api_key`. The API receives a read-only Search query key.
+4. Ingest the exact selected LiveDocs manifest, index the corpus with admin credentials
+   or an authorized identity, and verify every upload succeeded.
+5. Build/publish a new API image containing that same real corpus, then update its
+   immutable image reference and set `knowledge_runtime_mode = "azure"`.
+
+The currently published baseline image contains demo data. Merely switching modes
+does not replace that corpus with real business documentation. Application-owned
+ingestion and image publication must supply the matching real corpus first.
+
+Terraform owns the Free Search service `srch-ecommercestore-knowledge-${var.name_suffix}`
+and registers `Microsoft.Search` when enabled. The application owns schemas/content;
+documents are not embedded in Terraform state. Model resources/deployments are supplied
+separately and model calls have their own usage charges. Source ingestion uses the
+selected immutable manifest, not the newest Blob. Actual index statistics determine
+Free capacity; archive ZIP sizes cannot be compared directly with its 50 MB limit.
 
 ### Validate Knowledge changes before deployment
 
-The Terraform checks workflow runs on pull requests and main pushes, with the pinned
-provider lock file and no Azure credentials. It checks formatting, validates the full
-configuration and runs two mocked plan tests for disabled defaults, Azure app/container
-naming, the Web-to-API address and the Free Search tier. Run the same checks locally:
+CI requires formatting, full configuration validation and mocked plans for disabled
+defaults, Azure host names/configuration and demo hosting without Search/model keys.
+The mocks never contact Azure or the Storage backend.
 
 ```bash
 terraform init -backend=false -input=false -lockfile=readonly
@@ -1042,8 +1105,8 @@ terraform validate
 terraform test
 ```
 
-Mocks do not prove Azure capacity, deployed permissions or agreement with existing
-state. Before merging or applying this infrastructure change, run an authenticated
-plan in your normal deployment checkout with its existing variables and backend.
-Review resource changes, replacements and deletions. If this checkout was initialized
-with `-backend=false`, run `terraform init` first to initialize its normal backend.
+Mocks do not prove Azure capacity, permissions or agreement with existing state.
+An authenticated plan in the normal deployment checkout is required before apply.
+After using `-backend=false` in a checkout, run `terraform init` before its normal
+deployment plan.
+
