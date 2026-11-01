@@ -29,6 +29,8 @@ photo_storage_account_name = "stecproductsdevmb261013"
 #
 # For real LiveDocs: use knowledge_runtime_mode = "azure", then enable Free Search.
 # knowledge_search_enabled = true
+# knowledge_search_index = "knowledge-v1"
+# knowledge_embedding_revision = "1"
 # Model resources are configured separately; these reference existing deployments.
 # knowledge_models = {
 #   endpoint = "https://YOUR-RESOURCE.openai.azure.com/openai/v1/"
@@ -40,4 +42,3 @@ photo_storage_account_name = "stecproductsdevmb261013"
 # Add verified images as knowledge_api / knowledge_web when ready. Keep every
 # existing app_images entry. Azure mode needs the image with the indexed pinned
 # corpus; demo mode can use the labelled baseline demo image.
-

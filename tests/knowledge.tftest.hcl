@@ -26,7 +26,9 @@ run "knowledge_hosts_use_valid_names" {
   command = plan
 
   variables {
-    knowledge_search_enabled = true
+    knowledge_search_enabled     = true
+    knowledge_search_index       = "knowledge-tested"
+    knowledge_embedding_revision = "model-revision-2"
     knowledge_models = {
       endpoint             = "https://synthetic.openai.azure.com/openai/v1/"
       chat_deployment      = "synthetic-chat"
@@ -73,6 +75,8 @@ run "knowledge_hosts_use_valid_names" {
       for expected in [
         { name = "KA_RETRIEVAL_MODE", value = "azure" },
         { name = "KA_GENERATION_MODE", value = "azure" },
+        { name = "KA_SEARCH_INDEX", value = "knowledge-tested" },
+        { name = "KA_EMBEDDING_REVISION", value = "model-revision-2" },
         ] : anytrue([
           for env in azurerm_container_app.app["knowledge_api"].template[0].container[0].env :
           env.name == expected.name && env.value == expected.value

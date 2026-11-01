@@ -107,10 +107,11 @@ locals {
         KA_GENERATION_MODE = var.knowledge_runtime_mode == "demo" ? "evidence" : "azure"
         }, var.knowledge_runtime_mode == "azure" ? {
         KA_SEARCH_ENDPOINT      = try("https://${azurerm_search_service.knowledge[0].name}.search.windows.net", "")
-        KA_SEARCH_INDEX         = "knowledge-v1"
+        KA_SEARCH_INDEX         = var.knowledge_search_index
         KA_OPENAI_ENDPOINT      = var.knowledge_models.endpoint
         KA_EMBEDDING_DEPLOYMENT = var.knowledge_models.embedding_deployment
         KA_EMBEDDING_DIMENSIONS = tostring(var.knowledge_models.embedding_dimensions)
+        KA_EMBEDDING_REVISION   = var.knowledge_embedding_revision
         KA_CHAT_DEPLOYMENT      = var.knowledge_models.chat_deployment
       } : {})
       secrets = merge({
@@ -298,6 +299,3 @@ resource "azurerm_container_app" "app" {
     }
   }
 }
-
-
-
