@@ -4,13 +4,15 @@ locals {
     environment = "dev"
   }
   app_names = {
-    products = "ca-ecommercestore-products-dev"
-    bff      = "ca-ecommercestore-bff-dev"
-    web      = "ca-ecommercestore-web-dev"
-    users    = "ca-ecommercestore-users-dev"
-    orders   = "ca-ecommercestore-orders-dev"
-    payments = "ca-ecommercestore-payments-dev"
-    livedocs = "ca-ecommercestore-livedocs-dev"
+    products      = "ca-ecommercestore-products-dev"
+    bff           = "ca-ecommercestore-bff-dev"
+    web           = "ca-ecommercestore-web-dev"
+    users         = "ca-ecommercestore-users-dev"
+    orders        = "ca-ecommercestore-orders-dev"
+    payments      = "ca-ecommercestore-payments-dev"
+    livedocs      = "ca-ecommercestore-livedocs-dev"
+    knowledge_api = "ca-ecommercestore-ka-api-dev"
+    knowledge_web = "ca-ecommercestore-ka-web-dev"
   }
   app_urls = {
     for name, app_name in local.app_names :
@@ -58,3 +60,5 @@ resource "azurerm_storage_container" "photos" {
   storage_account_id    = azurerm_storage_account.photos.id
   container_access_type = "blob"
 }
+
+

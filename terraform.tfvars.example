@@ -20,3 +20,17 @@ photo_storage_account_name = "stecproductsdevmb261013"
 
 # Set passwords through TF_VAR_sql_admin_password / TF_VAR_mongo_admin_password.
 # Never put them in this example or commit your local terraform.tfvars.
+
+
+# Knowledge Assistant: enable only the Free Search service first.
+# knowledge_search_enabled = true
+# Model resources are configured separately; these reference existing deployments.
+# knowledge_models = {
+#   endpoint = "https://YOUR-RESOURCE.openai.azure.com/openai/v1/"
+#   chat_deployment = "YOUR-CHAT-DEPLOYMENT"
+#   embedding_deployment = "YOUR-EMBEDDING-DEPLOYMENT"
+#   embedding_dimensions = 1536
+# }
+# Supply TF_VAR_knowledge_openai_api_key and TF_VAR_knowledge_api_key securely.
+# Add verified images as knowledge_api / knowledge_web when ready. Keep every
+# existing app_images entry. The API image must contain the indexed pinned corpus.
