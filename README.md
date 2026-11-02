@@ -1127,3 +1127,115 @@ Mocks do not prove Azure capacity, permissions or agreement with existing state.
 An authenticated plan in the normal deployment checkout is required before apply.
 After using `-backend=false` in a checkout, run `terraform init` before its normal
 deployment plan.
+
+## 12. Pact registry (optional)
+
+Add Pact to this existing root/state after its application PR is merged and CI publishes
+`pact-image-reference/image-reference.json`. The default image repository is
+`docker.io/mb0101/ecommerce-store-pact-api`. Use the receipt's immutable `imageReference`,
+not `latest` or a local Docker image ID. The application workflow tests and scans one image,
+then publishes that same archived image after its quality gate succeeds.
+
+Keep every existing `app_images` entry and add:
+
+```hcl
+app_images = {
+  # ...keep the existing enabled applications...
+  pact = "docker.io/mb0101/ecommerce-store-pact-api@sha256:<digest from image-reference.json>"
+}
+pact_publishers = {
+  payments-ci = ["payments"]
+  invoice-ci  = ["invoice"]
+}
+```
+
+The existing `cae-ecommercestore-dev` environment and DocumentDB/Mongo-compatible cluster
+are reused. The one new ACA app is `ca-ecommercestore-pact-dev`, with 0–1 replicas,
+0.5 CPU/1 GiB, port 8080, process startup/liveness probes and Mongo-backed readiness.
+It uses the separate `ecommerce-store-pact-db` database name. No additional database cluster,
+Search service, paid database tier, VNet or state key is introduced. Optional Knowledge/Pact
+apps are additional instances beyond the historical seven-app core counts above.
+
+### Scoped publisher credentials
+
+Create two independent opaque bearer tokens of at least 32 characters. Store each raw token
+as `PACT_PUBLISHER_TOKEN` in its corresponding source repository (Payments or Invoice).
+The registry receives only SHA-256 hashes through ACA secret references. Wildcard scopes,
+empty publisher configuration, missing/extra hashes and duplicate hashes are rejected when
+Pact is enabled. `payments` owns its consumer publications/profiles; `invoice` owns provider
+publications/verification reports. Further applications need separate scoped publishers.
+
+In PowerShell 7, supply the hashes without putting raw tokens in variables files:
+
+```powershell
+$paymentsPublisherToken = Read-Host 'Payments publisher token' -AsSecureString | ConvertFrom-SecureString -AsPlainText
+$invoicePublisherToken = Read-Host 'Invoice publisher token' -AsSecureString | ConvertFrom-SecureString -AsPlainText
+$pactHashes = @{
+  'payments-ci' = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($paymentsPublisherToken))).ToLowerInvariant()
+  'invoice-ci' = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($invoicePublisherToken))).ToLowerInvariant()
+}
+$env:TF_VAR_pact_publisher_token_sha256 = $pactHashes | ConvertTo-Json -Compress
+```
+
+Retain the same SQL/Mongo passwords and other existing inputs for every plan. Mongo credentials
+and publisher hashes are injected with native ACA secrets/`secret_name`, following this root's
+existing pattern. Sensitive inputs are still present in Terraform state/saved plans; protect
+state access. Runtime hash references are separate from Docker Hub push/pull credentials.
+No raw publisher bearer token belongs in Terraform or a committed file.
+
+### Ingress, apply and verification
+
+Public HTTPS ingress is the default so GitHub-hosted runners can reach the registry. Anonymous
+reads/health follow the API's existing policy; every POST requires a scoped publisher token.
+`pact_allowed_ingress_cidrs` can restrict ingress to stable IPv4 egress ranges of self-hosted
+runners. This restriction also affects public reads and post-deployment verification. GitHub-hosted
+runners do not provide one fixed egress address. Set `pact_ingress_external = false` only if the
+callers/verifier have connectivity inside this ACA environment.
+
+Use the normal plan/review/apply sequence; no deployment wrapper or alternate state:
+
+```powershell
+terraform init
+terraform fmt -check -recursive
+terraform validate
+terraform plan "-out=pact.tfplan"
+terraform show -no-color pact.tfplan
+# Review changes against the existing deployment before applying.
+terraform apply pact.tfplan
+$pactUrl = (terraform output -json app_urls | ConvertFrom-Json).pact
+Invoke-RestMethod "$pactUrl/health/live" -TimeoutSec 180
+Invoke-RestMethod "$pactUrl/health/ready" -TimeoutSec 180
+```
+
+On an otherwise unchanged deployment, the intended addition is one Pact ACA app. Review
+unexpected credential rotations or changes to other resources before applying. Actual Azure
+capacity, credentials, network/firewall behavior and MongoDB compatibility require this real
+plan/apply and live verification; mocked Terraform plans cannot establish them.
+
+From an `ECommerceStore.Pact` checkout, run its non-writing verification helper:
+
+```powershell
+$env:PACT_PUBLISHER_TOKEN = $paymentsPublisherToken
+python scripts/verify-deployment.py --url $pactUrl --application payments
+Remove-Item Env:PACT_PUBLISHER_TOKEN
+```
+
+It waits for MongoDB readiness, checks liveness, requires anonymous POST rejection, then uses
+an intentionally invalid repository URL to verify the authenticated publisher's scope without
+storing a version. Redirects are refused so credentials are not forwarded to another URL.
+A real hosted URL/readiness result is pending the operator's apply; this change prepares the
+configuration, not evidence of an existing deployed registry. Source CI integration follows
+Pact backlog Tasks 08–09.
+
+Validate this change without contacting Azure/state:
+
+```powershell
+terraform init -backend=false -input=false -lockfile=readonly
+terraform fmt -check -recursive
+terraform validate
+terraform test
+```
+
+The mocked plans check disabled defaults, shared environment/database namespace, scoped secret
+references, probes, TLS/ingress and rejection of unsafe/missing configuration. Run `terraform init`
+again before a normal authenticated deployment plan in a checkout initialized with backend disabled.
