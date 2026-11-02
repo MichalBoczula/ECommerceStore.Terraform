@@ -137,6 +137,27 @@ locals {
       secrets    = { "knowledge-api-key" = var.knowledge_api_key }
       secret_env = { KNOWLEDGE_API_KEY = "knowledge-api-key" }
     }
+    pact = {
+      port       = 8080
+      live_path  = "/health/live"
+      ready_path = "/health/ready"
+      env = merge({
+        ASPNETCORE_ENVIRONMENT = "Production"
+        ASPNETCORE_HTTP_PORTS  = "8080"
+        Mongo__DatabaseName    = var.pact_mongo_database_name
+        Mongo__TimeoutSeconds  = tostring(var.pact_mongo_timeout_seconds)
+        }, merge({}, [for publisher, applications in var.pact_publishers : {
+          for index, application in sort(tolist(applications)) :
+          "RegistryAuth__Publishers__${publisher}__ApplicationIds__${index}" => application
+        }]...)
+      )
+      secrets = merge({ "database-connection" = local.users_connection_string }, {
+        for publisher in keys(var.pact_publishers) : "pact-publisher-${publisher}" => lookup(var.pact_publisher_token_sha256, publisher, null)
+      })
+      secret_env = merge({ Mongo__ConnectionString = "database-connection" }, {
+        for publisher in keys(var.pact_publishers) : "RegistryAuth__Publishers__${publisher}__TokenSha256" => "pact-publisher-${publisher}"
+      })
+    }
     livedocs = {
       port       = 8080
       live_path  = "/health/live"
@@ -187,10 +208,18 @@ resource "azurerm_container_app" "app" {
 
   # Public URLs make each educational app easy to inspect during deployment.
   ingress {
-    external_enabled           = true
+    external_enabled           = each.key == "pact" ? var.pact_ingress_external : true
     allow_insecure_connections = false
     target_port                = local.app_config[each.key].port
     transport                  = "http"
+    dynamic "ip_security_restriction" {
+      for_each = each.key == "pact" ? { for index, cidr in sort(tolist(var.pact_allowed_ingress_cidrs)) : index => cidr } : {}
+      content {
+        name             = "pact-ci-${ip_security_restriction.key}"
+        action           = "Allow"
+        ip_address_range = ip_security_restriction.value
+      }
+    }
     traffic_weight {
       latest_revision = true
       percentage      = 100
@@ -209,9 +238,9 @@ resource "azurerm_container_app" "app" {
     container {
       name  = replace(each.key, "_", "-")
       image = each.value
-      # Orders renders PDFs with Chromium; the other apps keep their allocation.
-      cpu    = each.key == "orders" ? 0.5 : 0.25
-      memory = each.key == "orders" ? "1Gi" : "0.5Gi"
+      # Orders renders PDFs; Pact runs bounded comparisons and verification matrices.
+      cpu    = contains(["orders", "pact"], each.key) ? 0.5 : 0.25
+      memory = contains(["orders", "pact"], each.key) ? "1Gi" : "0.5Gi"
 
       dynamic "env" {
         for_each = local.app_config[each.key].env
@@ -263,6 +292,17 @@ resource "azurerm_container_app" "app" {
   ]
 
   lifecycle {
+    precondition {
+      condition = each.key != "pact" || (
+        length(var.pact_publishers) > 0 &&
+        toset(keys(var.pact_publishers)) == toset(keys(var.pact_publisher_token_sha256))
+      )
+      error_message = "Pact requires explicit scoped publishers and exactly one distinct token hash for each publisher."
+    }
+    precondition {
+      condition     = each.key != "pact" || can(regex("^docker\\.io/[a-z0-9._-]+/[a-z0-9._-]+@sha256:[a-f0-9]{64}$", each.value))
+      error_message = "Deploy Pact using the tested Docker Hub image's immutable docker.io/namespace/repository@sha256 digest."
+    }
     precondition {
       condition = each.key != "knowledge_api" || (
         var.knowledge_api_key != null && (

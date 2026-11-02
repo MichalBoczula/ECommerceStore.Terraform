@@ -42,3 +42,16 @@ photo_storage_account_name = "stecproductsdevmb261013"
 # Add verified images as knowledge_api / knowledge_web when ready. Keep every
 # existing app_images entry. Azure mode needs the image with the indexed pinned
 # corpus; demo mode can use the labelled baseline demo image.
+
+# Pact registry: add app_images.pact using image-reference.json from the Pact CI run.
+# pact = "docker.io/mb0101/ecommerce-store-pact-api@sha256:<64 hex digest>"
+# Keep existing entries. Pact reuses the existing ACA environment/Mongo cluster.
+# pact_publishers = {
+#   payments-ci = ["payments"]
+#   invoice-ci  = ["invoice"]
+# }
+# Supply matching token hashes through TF_VAR_pact_publisher_token_sha256 (JSON map).
+# Keep the raw bearer tokens in their source repositories' PACT_PUBLISHER_TOKEN secrets.
+# pact_mongo_database_name = "ecommerce-store-pact-db"
+# pact_ingress_external = true # required for GitHub-hosted runners
+# pact_allowed_ingress_cidrs = [] # optional stable IPv4 runner egress CIDRs
