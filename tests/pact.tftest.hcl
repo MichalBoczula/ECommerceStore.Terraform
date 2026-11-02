@@ -1,7 +1,14 @@
 mock_provider "azurerm" {
-  override_during = plan
-  mock_resource "azurerm_mongo_cluster" {
+  mock_resource "azurerm_container_app_environment" {
+    override_during = plan
     defaults = {
+      id = "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-ecommercestore-dev/providers/Microsoft.App/managedEnvironments/cae-ecommercestore-dev"
+    }
+  }
+  mock_resource "azurerm_mongo_cluster" {
+    override_during = plan
+    defaults = {
+      id                 = "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-ecommercestore-dev/providers/Microsoft.DocumentDB/mongoClusters/synthetic-mongo"
       connection_strings = [{ name = "synthetic", value = "mongodb+srv://synthetic:old-password@synthetic.mongocluster.cosmos.azure.com/?tls=true" }]
     }
   }
