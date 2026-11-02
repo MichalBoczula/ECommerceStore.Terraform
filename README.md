@@ -1183,6 +1183,18 @@ existing pattern. Sensitive inputs are still present in Terraform state/saved pl
 state access. Runtime hash references are separate from Docker Hub push/pull credentials.
 No raw publisher bearer token belongs in Terraform or a committed file.
 
+For a later token-only rotation, update the source CI token and matching Terraform hash,
+review/apply the secret change, then restart the active Pact revision. ACA secret-only
+updates do not create a new revision or refresh existing process environment values:
+
+```powershell
+$pactRevision = az containerapp revision list --resource-group rg-ecommercestore-dev --name ca-ecommercestore-pact-dev --query "[?properties.active].name | [0]" --output tsv
+az containerapp revision restart --resource-group rg-ecommercestore-dev --name ca-ecommercestore-pact-dev --revision $pactRevision
+```
+
+Run the non-writing scope/readiness verifier with the new token after the restart.
+See [Microsoft's secret update guidance](https://learn.microsoft.com/azure/container-apps/manage-secrets).
+
 ### Ingress, apply and verification
 
 Public HTTPS ingress is the default so GitHub-hosted runners can reach the registry. Anonymous
