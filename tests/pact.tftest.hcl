@@ -1,4 +1,5 @@
 mock_provider "azurerm" {
+  override_during = plan
   mock_resource "azurerm_mongo_cluster" {
     defaults = {
       connection_strings = [{ name = "synthetic", value = "mongodb+srv://synthetic:old-password@synthetic.mongocluster.cosmos.azure.com/?tls=true" }]
@@ -63,7 +64,7 @@ run "pact_reuses_shared_infrastructure_and_scoped_secrets" {
         { name = "RegistryAuth__Publishers__payments-ci__TokenSha256", secret = "pact-publisher-payments-ci" },
         { name = "RegistryAuth__Publishers__invoice-ci__TokenSha256", secret = "pact-publisher-invoice-ci" },
         ] : anytrue([
-          for env in azurerm_container_app.app["pact"].template[0].container[0].env : env.name == expected.name && env.secret_name == expected.secret && env.value == ""
+          for env in azurerm_container_app.app["pact"].template[0].container[0].env : env.name == expected.name && env.secret_name == expected.secret && env.value == null
       ])
     ])
     error_message = "Mongo credentials and token hashes must be ACA secret references, not plaintext environment values."
