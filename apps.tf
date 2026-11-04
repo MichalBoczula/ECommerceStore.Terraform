@@ -158,6 +158,15 @@ locals {
         for publisher in keys(var.pact_publishers) : "RegistryAuth__Publishers__${publisher}__TokenSha256" => "pact-publisher-${publisher}"
       })
     }
+    pact_web = {
+      port       = 8080
+      live_path  = "/health/live"
+      ready_path = "/health/ready"
+      # Server-side Nginx origin, using ACA app-name discovery like the other Web apps.
+      env        = { PACT_API_URL = "http://${local.app_names.pact}" }
+      secrets    = {}
+      secret_env = {}
+    }
     livedocs = {
       port       = 8080
       live_path  = "/health/live"
@@ -302,6 +311,14 @@ resource "azurerm_container_app" "app" {
     precondition {
       condition     = each.key != "pact" || can(regex("^docker\\.io/[a-z0-9._-]+/[a-z0-9._-]+@sha256:[a-f0-9]{64}$", each.value))
       error_message = "Deploy Pact using the tested Docker Hub image's immutable docker.io/namespace/repository@sha256 digest."
+    }
+    precondition {
+      condition     = each.key != "pact_web" || contains(keys(var.app_images), "pact")
+      error_message = "Keep the pact API image when adding Pact Web; its anonymous read proxy requires the registry in this environment."
+    }
+    precondition {
+      condition     = each.key != "pact_web" || can(regex("^docker\\.io/[a-z0-9._-]+/[a-z0-9._-]+@sha256:[a-f0-9]{64}$", each.value))
+      error_message = "Deploy Pact Web using the tested Docker Hub image's immutable docker.io/namespace/repository@sha256 digest."
     }
     precondition {
       condition = each.key != "knowledge_api" || (

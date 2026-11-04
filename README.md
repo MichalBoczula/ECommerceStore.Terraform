@@ -1251,3 +1251,104 @@ terraform test
 The mocked plans check disabled defaults, shared environment/database namespace, scoped secret
 references, probes, TLS/ingress and rejection of unsafe/missing configuration. Run `terraform init`
 again before a normal authenticated deployment plan in a checkout initialized with backend disabled.
+
+## 13. Pact Web dashboard (optional, WEB/11)
+
+Pact Web joins this same root, state key, resource group and `cae-ecommercestore-dev`
+environment. Add **`pact_web` inside the existing `app_images` map**, retaining `pact` and
+every other enabled app/image. It is disabled by default. There is no additional environment,
+database, Search service, storage account or state backend for the dashboard.
+
+| Contract | Configuration |
+| --- | --- |
+| Terraform address | `azurerm_container_app.app["pact_web"]` |
+| ACA / container names | `ca-ecommercestore-pact-web-dev` / `pact-web` |
+| Ingress | Public HTTPS, target port 8080; insecure external connections disabled |
+| Scale / resources | Consumption, 0–1 replicas, 0.25 CPU / 0.5 GiB |
+| Startup / liveness | HTTP `/health/live` on 8080 |
+| Readiness | HTTP `/health/ready` on 8080; local Nginx/SPA availability |
+| Server-side setting | `PACT_API_URL=http://ca-ecommercestore-pact-dev` |
+| App URL | Existing `app_urls.pact_web` output |
+
+The origin uses ACA's [same-environment app-name discovery](https://learn.microsoft.com/en-us/azure/container-apps/connect-apps#call-a-container-app-by-name),
+following the Store and Knowledge Web patterns. The internal ingress listener on port 80 routes
+to the API's target port 8080; no `/api` suffix is added to the origin. Nginx removes `/backend`
+from anonymous `/backend/api/...` GETs, and the browser uses the frontend HTTPS origin.
+The API can retain internal ingress; adding Web does not change `pact_ingress_external`,
+its selected CIDR rules or its publisher scopes. Verify actual proxy access with the selected
+ingress rules after deployment. Web exposes the anonymous registry read surface; writes remain
+in source CI and the frontend proxy rejects non-GET requests.
+
+No publisher token/hash, Mongo connection or Knowledge proxy key is injected into the frontend.
+The optional existing Docker Hub **pull** secret is used only by ACA's registry configuration,
+not as an environment variable in the Web process. The Web probes do not establish API/Mongo
+health or a passing verification/compatibility result.
+
+### Obtain the published image first
+
+Use the `imageReference` from the **`pact-web-image-reference`** artifact of a successful
+[`ECommerceStore.Pact.Web` main workflow](https://github.com/MichalBoczula/ECommerceStore.Pact.Web/actions/workflows/ci.yml).
+It identifies the same image that passed container smoke and Trivy scan, was archived/reloaded,
+and was published after the quality gate. A PR candidate image ID is not a registry digest.
+The default repository is `docker.io/mb0101/ecommerce-store-pact-web`.
+
+If publication reports missing Docker Hub credentials, configure **`DOCKER_USER`** and
+**`DOCKER_TOKEN`** in the frontend repository's Actions secrets (`DOCKERHUB_USERNAME` and
+`DOCKERHUB_TOKEN` are supported fallbacks), then rerun its failed publication job while the
+tested-image artifact is still available (one-day retention). If it has expired, rerun the
+main workflow so a new candidate passes all required checks before publication. Do not bypass
+the gate or substitute `latest`, an untested local image, or a made-up digest.
+
+Add the Web receipt's full immutable reference while preserving the API's existing verified
+reference and its section 12 publisher configuration:
+
+```hcl
+app_images = {
+  # ...keep every existing enabled application...
+  pact     = "docker.io/mb0101/ecommerce-store-pact-api@sha256:<existing verified API digest>"
+  pact_web = "docker.io/mb0101/ecommerce-store-pact-web@sha256:<Web receipt digest>"
+}
+```
+
+The angle-bracket values are instructions, not deployable references. Planning rejects a
+missing `pact` entry, mutable Web tags and incomplete/non-Docker-Hub digest references.
+Keep existing passwords, publisher hashes, region/names, Knowledge settings and registry inputs.
+
+### Review/apply and live checks
+
+Run these commands separately from the existing deployment checkout using its existing variables
+and backend. The apply remains manual:
+
+```powershell
+git pull --ff-only
+terraform init
+terraform fmt -check -recursive
+terraform validate
+terraform plan "-out=pact-web.tfplan"
+terraform show -no-color pact-web.tfplan
+# Review the saved plan against the current deployment before applying.
+terraform apply pact-web.tfplan
+$pactWebUrl = (terraform output -json app_urls | ConvertFrom-Json).pact_web
+Invoke-WebRequest "$pactWebUrl/health/live" -TimeoutSec 180
+Invoke-WebRequest "$pactWebUrl/health/ready" -TimeoutSec 180
+Invoke-WebRequest "$pactWebUrl/verifications" -TimeoutSec 180
+Invoke-RestMethod "$pactWebUrl/backend/api/applications?pageSize=1" -TimeoutSec 180
+```
+
+With Pact already present and no other drift, the intended addition is one ACA app at
+`app["pact_web"]`; if both are new, expect both Pact apps. Review any removals, replacements,
+credential rotations or unrelated changes before applying. Use the existing state key;
+do not initialize another state or replace the complete `app_images` map with this excerpt.
+
+The deep-link response should be Angular HTML and the proxied read should be registry JSON,
+including a valid empty page for an empty registry. An outage must remain an unavailable/error
+state. Reaching the probes alone does not prove proxy routing, real evidence, or source CI.
+WEB/12 verifies hosted browser behavior and the real Payments → Invoice failure/fix flow after
+operator deployment and the backend PACT/09 source-CI pilot. This Terraform change does not
+claim those hosted results or run an Azure apply.
+
+The existing credential-free CI runs format, locked initialization with backend disabled,
+validation and `terraform test`. The new plan-only tests cover disabled defaults, valid names,
+the exact image/origin/port/probes, scale-to-zero, secret isolation, coexistence with all Store
+and Knowledge apps, retained API ingress/scopes, and rejection of missing API/mutable digests.
+These mocks do not verify Azure capacity, DNS, ingress rules, state drift or live application health.

@@ -55,3 +55,9 @@ photo_storage_account_name = "stecproductsdevmb261013"
 # pact_mongo_database_name = "ecommerce-store-pact-db"
 # pact_ingress_external = true # required for GitHub-hosted runners
 # pact_allowed_ingress_cidrs = [] # optional stable IPv4 runner egress CIDRs
+
+# Pact dashboard (WEB/11): retain pact and all existing entries in app_images, then add:
+# pact_web = "docker.io/mb0101/ecommerce-store-pact-web@sha256:<64 hex digest>"
+# Use image-reference.json from the frontend main CI's pact-web-image-reference artifact.
+# Terraform sets PACT_API_URL to the same-environment Pact app name; no browser or
+# frontend publisher credential is required. Runtime port/probes are 8080 and /health/*.

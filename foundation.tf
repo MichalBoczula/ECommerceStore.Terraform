@@ -14,6 +14,7 @@ locals {
     knowledge_api = "ca-ecommercestore-ka-api-dev"
     knowledge_web = "ca-ecommercestore-ka-web-dev"
     pact          = "ca-ecommercestore-pact-dev"
+    pact_web      = "ca-ecommercestore-pact-web-dev"
   }
   app_urls = {
     for name, app_name in local.app_names :
