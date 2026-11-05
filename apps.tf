@@ -309,38 +309,37 @@ resource "azurerm_container_app" "app" {
       error_message = "Pact requires explicit scoped publishers and exactly one distinct token hash for each publisher."
     }
     precondition {
-      condition     = each.key != "pact" || can(regex("^docker\\.io/[a-z0-9._-]+/[a-z0-9._-]+@sha256:[a-f0-9]{64}$", each.value))
-      error_message = "Deploy Pact using the tested Docker Hub image's immutable docker.io/namespace/repository@sha256 digest."
-    }
-    precondition {
       condition     = each.key != "pact_web" || contains(keys(var.app_images), "pact")
       error_message = "Keep the pact API image when adding Pact Web; its anonymous read proxy requires the registry in this environment."
-    }
-    precondition {
-      condition     = each.key != "pact_web" || can(regex("^docker\\.io/[a-z0-9._-]+/[a-z0-9._-]+@sha256:[a-f0-9]{64}$", each.value))
-      error_message = "Deploy Pact Web using the tested Docker Hub image's immutable docker.io/namespace/repository@sha256 digest."
     }
     precondition {
       condition = each.key != "knowledge_api" || (
         var.knowledge_api_key != null && (
           var.knowledge_runtime_mode == "demo" || (
             var.knowledge_search_enabled &&
-            startswith(var.knowledge_models.endpoint, "https://") &&
-            length(var.knowledge_models.chat_deployment) > 0 &&
-            length(var.knowledge_models.embedding_deployment) > 0 &&
-            var.knowledge_openai_api_key != null
+            can(regex("^https://[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?/openai/v1/?$", var.knowledge_models.endpoint)) &&
+            try(length(trimspace(var.knowledge_models.chat_deployment)) > 0, false) &&
+            try(length(trimspace(var.knowledge_models.embedding_deployment)) > 0, false) &&
+            try(length(trimspace(var.knowledge_openai_api_key)) > 0, false)
           )
         )
       )
-      error_message = "Knowledge API requires a shared API key. Azure mode also requires Free Search and complete existing model/key settings."
+      error_message = "Knowledge API requires a shared API key. Azure mode also requires Free Search, an HTTPS /openai/v1 endpoint, chat and embedding deployment names, and a nonblank OpenAI API key."
+    }
+    precondition {
+      condition = each.key != "knowledge_api" || var.knowledge_runtime_mode != "azure" || (
+        try(local.release_inventory.applications.knowledge_api.contentMode, "") != "synthetic-demo" ||
+        !endswith(each.value, "@${split("@", local.release_inventory.applications.knowledge_api.imageReference)[1]}")
+      )
+      error_message = "The catalog's synthetic Knowledge API image requires demo mode. Use the indexed refresh image for Azure mode."
     }
     precondition {
       condition     = each.key != "knowledge_web" || (contains(keys(var.app_images), "knowledge_api") && var.knowledge_api_key != null)
       error_message = "Knowledge Web requires the knowledge_api image and shared server-side API key."
     }
     precondition {
-      condition     = each.key != "bff" || contains(keys(var.app_images), "products")
-      error_message = "Keep the products image when adding BFF."
+      condition     = each.key != "bff" || alltrue([for app in ["products", "users"] : contains(keys(var.app_images), app)])
+      error_message = "Keep both products and users images when adding BFF."
     }
     precondition {
       condition     = each.key != "web" || contains(keys(var.app_images), "bff")

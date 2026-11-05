@@ -38,8 +38,8 @@ run "knowledge_hosts_use_valid_names" {
     knowledge_openai_api_key = "synthetic-test-key"
     knowledge_api_key        = "synthetic-test-key-0123456789abcdef"
     app_images = {
-      knowledge_api = "example.invalid/knowledge-api@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-      knowledge_web = "example.invalid/knowledge-web@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      knowledge_api = "docker.io/synthetic/knowledge-api@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      knowledge_web = "docker.io/synthetic/knowledge-web@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
     }
   }
 
@@ -100,8 +100,8 @@ run "demo_hosts_work_without_search_or_models" {
     knowledge_runtime_mode = "demo"
     knowledge_api_key      = "synthetic-test-key-0123456789abcdef"
     app_images = {
-      knowledge_api = "example.invalid/knowledge-api@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-      knowledge_web = "example.invalid/knowledge-web@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      knowledge_api = "docker.io/synthetic/knowledge-api@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      knowledge_web = "docker.io/synthetic/knowledge-web@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
     }
   }
 
@@ -137,4 +137,72 @@ run "demo_hosts_work_without_search_or_models" {
     ])
     error_message = "Demo must not configure cloud-provider calls."
   }
+}
+
+run "azure_knowledge_requires_free_search" {
+  command = plan
+  variables {
+    knowledge_search_enabled = false
+    knowledge_models = {
+      endpoint             = "https://synthetic.openai.azure.com/openai/v1/"
+      chat_deployment      = "synthetic-chat"
+      embedding_deployment = "synthetic-embedding"
+      embedding_dimensions = 1536
+    }
+    knowledge_openai_api_key = "synthetic-test-key"
+    knowledge_api_key        = "synthetic-test-key-0123456789abcdef"
+    app_images               = { knowledge_api = "docker.io/synthetic/knowledge-api@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }
+  }
+  expect_failures = [azurerm_container_app.app]
+}
+
+run "azure_knowledge_requires_nonblank_openai_key" {
+  command = plan
+  variables {
+    knowledge_search_enabled = true
+    knowledge_models = {
+      endpoint             = "https://synthetic.openai.azure.com/openai/v1/"
+      chat_deployment      = "synthetic-chat"
+      embedding_deployment = "synthetic-embedding"
+      embedding_dimensions = 1536
+    }
+    knowledge_openai_api_key = " "
+    knowledge_api_key        = "synthetic-test-key-0123456789abcdef"
+    app_images               = { knowledge_api = "docker.io/synthetic/knowledge-api@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }
+  }
+  expect_failures = [azurerm_container_app.app]
+}
+
+run "azure_knowledge_rejects_model_endpoint_without_v1_path" {
+  command = plan
+  variables {
+    knowledge_search_enabled = true
+    knowledge_models = {
+      endpoint             = "https://synthetic.openai.azure.com/"
+      chat_deployment      = "synthetic-chat"
+      embedding_deployment = "synthetic-embedding"
+      embedding_dimensions = 1536
+    }
+    knowledge_openai_api_key = "synthetic-test-key"
+    knowledge_api_key        = "synthetic-test-key-0123456789abcdef"
+    app_images               = { knowledge_api = "docker.io/synthetic/knowledge-api@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }
+  }
+  expect_failures = [azurerm_container_app.app]
+}
+
+run "azure_knowledge_rejects_the_published_demo_corpus" {
+  command = plan
+  variables {
+    knowledge_search_enabled = true
+    knowledge_models = {
+      endpoint             = "https://synthetic.openai.azure.com/openai/v1/"
+      chat_deployment      = "synthetic-chat"
+      embedding_deployment = "synthetic-embedding"
+      embedding_dimensions = 1536
+    }
+    knowledge_openai_api_key = "synthetic-test-key"
+    knowledge_api_key        = "synthetic-test-key-0123456789abcdef"
+    app_images               = { knowledge_api = jsondecode(file("releases/portfolio.json")).applications.knowledge_api.imageReference }
+  }
+  expect_failures = [azurerm_container_app.app]
 }
