@@ -20,6 +20,7 @@ variable "knowledge_runtime_mode" {
   description = "Azure uses indexed LiveDocs and configured models; demo uses the image's labelled synthetic corpus with local extraction."
   type        = string
   default     = "azure"
+  nullable    = false
   validation {
     condition     = contains(["demo", "azure"], var.knowledge_runtime_mode)
     error_message = "Knowledge runtime mode must be demo or azure."
@@ -54,6 +55,7 @@ variable "knowledge_models" {
     embedding_deployment = string
     embedding_dimensions = number
   })
+  nullable = false
   default = {
     endpoint             = ""
     chat_deployment      = ""
@@ -61,7 +63,7 @@ variable "knowledge_models" {
     embedding_dimensions = 1536
   }
   validation {
-    condition     = var.knowledge_models.embedding_dimensions >= 1 && var.knowledge_models.embedding_dimensions <= 4096 && floor(var.knowledge_models.embedding_dimensions) == var.knowledge_models.embedding_dimensions
+    condition     = var.knowledge_models.embedding_dimensions == null ? false : var.knowledge_models.embedding_dimensions >= 1 && var.knowledge_models.embedding_dimensions <= 4096 && floor(var.knowledge_models.embedding_dimensions) == var.knowledge_models.embedding_dimensions
     error_message = "Embedding dimensions must be an integer from 1 to 4096 and match the deployed embedding model."
   }
 }

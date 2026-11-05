@@ -3,13 +3,14 @@ variable "pact_publishers" {
   description = "Publisher IDs mapped to explicit application scopes. Pact is enabled by adding app_images.pact. Wildcard scopes are not accepted for this hosted registry."
   type        = map(set(string))
   default     = {}
+  nullable    = false
   validation {
     condition = length(var.pact_publishers) <= 10 && alltrue([
       for publisher, applications in var.pact_publishers :
       length(publisher) <= 100 && can(regex("^[a-z0-9]+(-[a-z0-9]+)*$", publisher)) &&
-      length(applications) >= 1 && length(applications) <= 20 && alltrue([
-        for application in applications : length(application) <= 100 && can(regex("^[a-z0-9]+(-[a-z0-9]+)*$", application))
-      ])
+      (applications == null ? false : length(applications) >= 1 && length(applications) <= 20 && alltrue([
+        for application in applications : can(regex("^[a-z0-9]+(-[a-z0-9]+)*$", application)) && try(length(application) <= 100, false)
+      ]))
     ])
     error_message = "Use at most 10 lowercase publisher IDs with 1-20 explicit valid application IDs each; no wildcard scopes."
   }
@@ -20,9 +21,10 @@ variable "pact_publisher_token_sha256" {
   type        = map(string)
   sensitive   = true
   default     = {}
+  nullable    = false
   validation {
     condition = (alltrue([for hash in values(var.pact_publisher_token_sha256) : can(regex("^[a-fA-F0-9]{64}$", hash))]) &&
-    length(distinct([for hash in values(var.pact_publisher_token_sha256) : lower(hash)])) == length(var.pact_publisher_token_sha256))
+    length(distinct([for hash in values(var.pact_publisher_token_sha256) : try(lower(hash), "")])) == length(var.pact_publisher_token_sha256))
     error_message = "Publisher token hashes must be distinct 64-character hexadecimal SHA-256 values."
   }
 }

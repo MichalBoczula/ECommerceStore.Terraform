@@ -97,6 +97,22 @@ run "pact_requires_publisher_configuration" {
   expect_failures = [azurerm_container_app.app]
 }
 
+run "pact_requires_hash_for_each_configured_publisher" {
+  command = plan
+  variables {
+    app_images = { pact = "docker.io/mb0101/ecommerce-store-pact-api@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }
+    pact_publishers = {
+      payments-ci = ["payments"]
+      invoice-ci  = ["invoice"]
+    }
+    pact_publisher_token_sha256 = {
+      payments-ci = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      unknown-ci  = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    }
+  }
+  expect_failures = [azurerm_container_app.app]
+}
+
 run "pact_rejects_mutable_image_tag" {
   command = plan
   variables {
@@ -104,7 +120,7 @@ run "pact_rejects_mutable_image_tag" {
     pact_publishers             = { payments-ci = ["payments"] }
     pact_publisher_token_sha256 = { payments-ci = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" }
   }
-  expect_failures = [azurerm_container_app.app]
+  expect_failures = [var.app_images]
 }
 
 run "pact_rejects_wildcard_scopes" {

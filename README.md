@@ -37,8 +37,8 @@ still required. There are no Internet-wide database firewall rules or outbound I
 | --- | ---: |
 | None — first apply | 11 |
 | Products | 12 |
-| Products + BFF | 13 |
-| Products + BFF + Web | 14 |
+| Products + Users | 13 |
+| Products + Users + BFF | 14 |
 | Products + BFF + Web + Users | 15 |
 | Products + BFF + Web + Users + Orders/Invoices | 16 |
 | All six store apps, including Payments | 17 |
@@ -216,13 +216,15 @@ the same request. Liveness alone does not prove database connectivity.
 
 ## 5. Deploy BFF
 
-After Products readiness, Swagger and photo checks succeed, keep its image entry
-and add BFF to the same `app_images` block in your existing `terraform.tfvars`:
+Deploy Products and Users before BFF, or include all three in the same plan.
+For a staged deployment, follow [Deploy Users](#7-deploy-users) first. After the
+upstream readiness checks succeed, add BFF to the existing `app_images` map.
 
 ```hcl
 app_images = {
   products = "docker.io/mb0101/product-catalog-api@sha256:dd92571adbbe889faacca4c0a72b4296a64e234c0ca9d57c9cf85b08bbd054d8"
   bff      = "docker.io/mb0101/ecommerce-store-bff-api@sha256:ccf624855827c6ca0d59ffbf4b19459ad0d5899bbe997ba90ecabfd5e528873a"
+  users    = "docker.io/mb0101/ecommerce-store-users-api@sha256:640624f8daa0cbe981e7bf475312564faa947b71c10e1dd343a279ca8cdaa51d"
 }
 ```
 
@@ -250,8 +252,8 @@ local variables. If starting a new shell, enter the same token as shown above.
 Do not define `dockerhub_token` in `terraform.tfvars`, where it would override the
 environment variable. Keep `dockerhub_username = "mb0101"`.
 
-With Products already applied and no drift, expect **1 to add, 0 to change, 0 to
-destroy**: `azurerm_container_app.app["bff"]`. Apply the new plan:
+With Products and Users already applied and no drift, expect **1 to add, 0 to
+change, 0 to destroy** for `azurerm_container_app.app["bff"]`. Apply the new plan.
 
 ```powershell
 terraform apply bff.tfplan
@@ -276,8 +278,8 @@ The first Products readiness request warms SQL before testing the gateway. A BFF
 health result alone does not check any upstream API. The product route remains
 `/mobile-phones`; `/api/products` is a prefix only for the proxied OpenAPI document
 at `/api/products/swagger/v1/swagger.json`. The BFF serves Scalar at
-`/scalar/products`, rather than its own Swagger UI. Users, Orders and Payments
-routes require their applications to be deployed later.
+`/scalar/products`. Orders and Payments routes become available as those apps
+are deployed.
 
 ## 6. Deploy Web
 
@@ -293,13 +295,14 @@ proxying and sends the BFF Host. Browser access remains HTTPS with same-origin A
 requests. There is no custom startup script or per-environment Angular rebuild.
 Docker Compose retains its default `http://bff:8080` destination.
 
-Keep both existing applications and add Web in your local `terraform.tfvars`:
+Keep Products, Users and BFF when adding Web in your local `terraform.tfvars`.
 
 ```hcl
 app_images = {
   products = "docker.io/mb0101/product-catalog-api@sha256:dd92571adbbe889faacca4c0a72b4296a64e234c0ca9d57c9cf85b08bbd054d8"
   bff      = "docker.io/mb0101/ecommerce-store-bff-api@sha256:ccf624855827c6ca0d59ffbf4b19459ad0d5899bbe997ba90ecabfd5e528873a"
   web      = "docker.io/mb0101/ecommerce-store-web@sha256:b8738eb18d2de58045a408c1b1df79b04bb9ba673bec848983031a03cc19773d"
+  users    = "docker.io/mb0101/ecommerce-store-users-api@sha256:640624f8daa0cbe981e7bf475312564faa947b71c10e1dd343a279ca8cdaa51d"
 }
 ```
 
@@ -318,8 +321,8 @@ terraform validate
 terraform plan "-out=web.tfplan"
 ```
 
-With Products and BFF already applied and no drift, expect **1 to add, 0 to change,
-0 to destroy**: `azurerm_container_app.app["web"]`. The web container uses port 80,
+With Products, Users and BFF already applied and no drift, expect **1 to add, 0 to
+change, 0 to destroy** for `azurerm_container_app.app["web"]`. The web container uses port 80,
 0–1 replicas and `/` for its startup, liveness and readiness probes. The root probe
 checks the SPA, not the upstream services. Apply the fresh plan:
 
@@ -371,9 +374,9 @@ link and refresh that page to check Nginx's SPA fallback. Cold ACA replicas and 
 may make the first request slow; after a cold-start timeout, retry the request.
 
 This verifies **Web → `/backend` → BFF → Products → SQL**, including photos. The current
-BFF/UI also contain Users, Invoice and Payments features; complete registration,
-cart, orders and checkout require those services later. Use demo data: the customer
-selector is not authentication.
+BFF/UI also contain Users, Invoice and Payments features. Deploy Orders and Payments
+to complete registration, cart, orders and checkout. Use demo data with the
+customer selector, which accepts demo identities without credentials.
 
 Do not remove existing image entries when adding another app: removal plans to
 destroy that Container App. Leave entries present to retain the applications.
@@ -382,18 +385,15 @@ destroy that Container App. Leave entries present to retain the applications.
 
 The existing foundation already contains the DocumentDB Free cluster and its Azure
 services firewall rule. Adding Users creates **one Container App**, reusing that
-cluster and the same ACA environment. BFF already has its Users destination and
-routes; Web forwards those requests through `/backend`.
+cluster and the same ACA environment. A staged bootstrap adds Users before BFF.
 
 Pull the update and add the `users` entry to your existing `app_images` map in
-`terraform.tfvars`. Keep all three deployed images and the same database passwords
-and Docker Hub token:
+`terraform.tfvars`. Keep any existing image entries and the same database passwords
+and Docker Hub token. The example shows the stage after Products.
 
 ```hcl
 app_images = {
   products = "docker.io/mb0101/product-catalog-api@sha256:dd92571adbbe889faacca4c0a72b4296a64e234c0ca9d57c9cf85b08bbd054d8"
-  bff      = "docker.io/mb0101/ecommerce-store-bff-api@sha256:ccf624855827c6ca0d59ffbf4b19459ad0d5899bbe997ba90ecabfd5e528873a"
-  web      = "docker.io/mb0101/ecommerce-store-web@sha256:b8738eb18d2de58045a408c1b1df79b04bb9ba673bec848983031a03cc19773d"
   users    = "docker.io/mb0101/ecommerce-store-users-api@sha256:640624f8daa0cbe981e7bf475312564faa947b71c10e1dd343a279ca8cdaa51d"
 }
 ```
@@ -427,7 +427,7 @@ terraform validate
 terraform plan "-out=users.tfplan"
 ```
 
-With Products, BFF and Web already deployed and no other drift, expect
+With Products already deployed and no other drift, expect
 **1 to add, 0 to change, 0 to destroy**: `azurerm_container_app.app["users"]`.
 The existing database, storage and other Container Apps should remain untouched.
 
@@ -435,16 +435,17 @@ The existing database, storage and other Container Apps should remain untouched.
 terraform apply users.tfplan
 $appUrls = terraform output -json app_urls | ConvertFrom-Json
 $usersUrl = $appUrls.users
-$bffUrl = $appUrls.bff
-$webUrl = $appUrls.web
 Invoke-RestMethod "$usersUrl/health/ready" -TimeoutSec 180
 Start-Process "$usersUrl/swagger"
-Start-Process "$bffUrl/scalar/users"
 ```
 
-Expect `Healthy`. Check a Mongo-backed read through the Web origin:
+Expect `Healthy`. After deploying BFF and Web, check a Mongo-backed read through
+the Web origin.
 
 ```powershell
+$appUrls = terraform output -json app_urls | ConvertFrom-Json
+$webUrl = $appUrls.web
+Start-Process "$($appUrls.bff)/scalar/users"
 $clientId = [guid]::NewGuid().ToString()
 $favorites = Invoke-RestMethod "$webUrl/backend/favorites/clients/$clientId" -TimeoutSec 180
 $favorites.Count

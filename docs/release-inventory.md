@@ -48,6 +48,10 @@ applies a plan. Use `store-pact` when Search will be provisioned later, or `stor
 for a store release without new Pact entries. Selecting `full-demo` intentionally
 selects the demo Knowledge image and requires its matching mode.
 
+Each `app_images` entry requires a full `docker.io/namespace/repository@sha256`
+reference with a 64-character lowercase digest. BFF needs both Products and Users,
+and each Web proxy needs its upstream app. These checks run during planning.
+
 Keep the existing database passwords, pull credentials if configured, and all
 already-enabled applications. Do not copy a partial map from an old walkthrough:
 removing an entry from `app_images` plans to remove its Container App. Review the
@@ -83,8 +87,9 @@ publishers for the expanded integration coverage.
 For Knowledge Web/API, supply the shared `TF_VAR_knowledge_api_key`. In Azure mode
 also supply `TF_VAR_knowledge_openai_api_key`, the existing endpoint and chat and
 embedding deployment names in `knowledge_models`, and the matching dimensions,
-`knowledge_search_index` and `knowledge_embedding_revision`. Terraform creates the
-Free Search service and passes a query key to the API. The Knowledge refresh
+`knowledge_search_index` and `knowledge_embedding_revision`. Use the HTTPS
+`/openai/v1` endpoint. The plan rejects the inventory's known demo image in Azure
+mode. Terraform creates Free Search and passes a query key to the API. The Knowledge refresh
 workflow owns ingestion, index schema, embeddings, and content. Its indexing
 credentials are separate from the API's query key. Terraform references existing
 model deployments; model provisioning is outside this release inventory.

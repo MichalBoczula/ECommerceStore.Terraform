@@ -104,19 +104,7 @@ run "pact_web_uses_shared_environment_and_anonymous_local_proxy" {
 run "pact_web_keeps_existing_apps_and_pact_policy" {
   command = plan
   variables {
-    app_images = {
-      products      = "example.invalid/products:synthetic"
-      bff           = "example.invalid/bff:synthetic"
-      web           = "example.invalid/web:synthetic"
-      users         = "example.invalid/users:synthetic"
-      orders        = "example.invalid/orders:synthetic"
-      payments      = "example.invalid/payments:synthetic"
-      livedocs      = "example.invalid/livedocs:synthetic"
-      knowledge_api = "example.invalid/knowledge-api:synthetic"
-      knowledge_web = "example.invalid/knowledge-web:synthetic"
-      pact          = "docker.io/mb0101/ecommerce-store-pact-api@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-      pact_web      = "docker.io/mb0101/ecommerce-store-pact-web@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-    }
+    app_images                  = { for app, release in jsondecode(file("releases/portfolio.json")).applications : app => release.imageReference }
     knowledge_runtime_mode      = "demo"
     knowledge_api_key           = "synthetic-test-key-0123456789abcdef"
     pact_publishers             = { payments-ci = ["payments"] }
@@ -154,6 +142,31 @@ run "pact_web_keeps_existing_apps_and_pact_policy" {
       for app in azurerm_container_app.app : app.template[0].min_replicas == 0 && app.template[0].max_replicas == 1
     ])
     error_message = "Adding a dashboard must not enable Search or change the selected apps' scale-to-zero policy."
+  }
+}
+
+run "store_pact_search_profile_plans_before_knowledge_release" {
+  command = plan
+  variables {
+    app_images = {
+      for app, release in jsondecode(file("releases/portfolio.json")).applications :
+      app => release.imageReference
+      if contains(jsondecode(file("releases/portfolio.json")).profiles["store-pact-search"].applications, app)
+    }
+    knowledge_search_enabled = true
+    pact_publishers          = jsondecode(file("releases/portfolio.json")).pactPublishers
+    pact_publisher_token_sha256 = {
+      payments-ci = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      invoice-ci  = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+  }
+  assert {
+    condition = (
+      length(azurerm_container_app.app) == 9 &&
+      alltrue([for app in keys(azurerm_container_app.app) : !startswith(app, "knowledge_")]) &&
+      length(azurerm_search_service.knowledge) == 1 && azurerm_search_service.knowledge[0].sku == "free"
+    )
+    error_message = "The initial Store and Pact release must plan with Free Search before supplying Knowledge images or credentials."
   }
 }
 
@@ -197,7 +210,7 @@ run "pact_web_rejects_mutable_image_tags" {
     pact_publishers             = { payments-ci = ["payments"] }
     pact_publisher_token_sha256 = { payments-ci = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc" }
   }
-  expect_failures = [azurerm_container_app.app]
+  expect_failures = [var.app_images]
 }
 
 run "pact_web_rejects_an_incomplete_digest" {
@@ -210,13 +223,40 @@ run "pact_web_rejects_an_incomplete_digest" {
     pact_publishers             = { payments-ci = ["payments"] }
     pact_publisher_token_sha256 = { payments-ci = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc" }
   }
-  expect_failures = [azurerm_container_app.app]
+  expect_failures = [var.app_images]
 }
 
 run "app_keys_remain_explicit" {
   command = plan
   variables {
-    app_images = { pact_frontend = "docker.io/mb0101/ecommerce-store-pact-web:synthetic" }
+    app_images = { pact_frontend = "docker.io/mb0101/ecommerce-store-pact-web@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" }
   }
   expect_failures = [var.app_images]
+}
+
+run "store_apps_reject_mutable_image_tags" {
+  command = plan
+  variables {
+    app_images = { products = "docker.io/mb0101/product-catalog-api:latest" }
+  }
+  expect_failures = [var.app_images]
+}
+
+run "null_app_map_cannot_disable_existing_apps" {
+  command = plan
+  variables {
+    app_images = null
+  }
+  expect_failures = [var.app_images]
+}
+
+run "bff_requires_users_alongside_products" {
+  command = plan
+  variables {
+    app_images = {
+      products = "docker.io/synthetic/products@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      bff      = "docker.io/synthetic/bff@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+  }
+  expect_failures = [azurerm_container_app.app]
 }
