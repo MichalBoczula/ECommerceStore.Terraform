@@ -9,7 +9,7 @@ the relevant checks.
 | --- | --- |
 | **TF/01 — Release inventory** | Record all eleven selected images and their successful CI publications, profile inputs and dependencies. Keep the existing Terraform root, state and full application map. |
 | **TF/02 — Configuration guards** | Enforce digest pins for all applications; complete application dependency, publisher and feature configuration checks. Cover valid and invalid combinations with mocked plans. |
-| **TF/03 — Initial deployment and verification** | Review a saved plan against live Azure state and deploy the store, Pact API/Web and Free Search foundation. Verify image revisions, prices/gallery, customer/cart/order operations, API/proxy readiness and scoped Pact access. Finish with a no-change plan. |
+| **TF/03 — Initial deployment and verification** | Use the [initial deployment runbook](initial-deployment.md) to review a saved plan and deploy Store, Pact API/Web and Free Search. Verify serving revisions, Store flows, Pact access and a final no-change plan. |
 | **TF/04 — Stripe runtime** | Add opt-in test checkout settings, secret references, actual return URLs and signed webhook configuration. Verify checkout and durable payment confirmation. |
 | **TF/05 — Fulfillment job** | Add the opt-in scheduled ACA Job with the selected Payments image and Mongo/Orders settings. Verify Succeeded payment → Paid order → one invoice/PDF, including replay and retries. |
 | **PACT/09 — First verified CI pilot** | Verify the Payments consumer contract against Invoice, publish immutable contracts/results and require the checks in source CI. Demonstrate a required-field failure and verified fix. |

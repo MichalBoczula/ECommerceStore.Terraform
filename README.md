@@ -7,6 +7,8 @@ For an existing deployment, start with the [release inventory](docs/release-inve
 and the [delivery plan](docs/delivery-plan.md). The numbered walkthroughs below
 retain historical bootstrap examples and image pins. Select current images from
 the inventory and keep your existing backend and `terraform.tfvars`.
+Use the [TF/03 deployment runbook](docs/initial-deployment.md) for the Store,
+Pact and Search rollout and its hosted checks.
 
 ## Resources
 
