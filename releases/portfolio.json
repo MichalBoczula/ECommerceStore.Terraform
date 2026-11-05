@@ -1,0 +1,257 @@
+{
+  "schemaVersion": 1,
+  "releaseId": "portfolio-2026-11-05",
+  "infrastructureBaseline": {
+    "repository": "MichalBoczula/ECommerceStore.Terraform",
+    "commitSha": "1f7091c7c379d01f12109c7167f3a5d2777f7151",
+    "validationRunUrl": "https://github.com/MichalBoczula/ECommerceStore.Terraform/actions/runs/41813582799"
+  },
+  "applications": {
+    "products": {
+      "repository": "MichalBoczula/ProductsCatalog",
+      "commitSha": "9730b12d10a6bbd7d59c2a634230be626969b6d3",
+      "imageReference": "docker.io/mb0101/product-catalog-api@sha256:250e7c508e4cd487db8c9060d306960b3657a396e60bc8f863cacbbafbe260d3",
+      "publication": {
+        "runId": 41336446705,
+        "runAttempt": 1,
+        "jobId": 124939077139,
+        "url": "https://github.com/MichalBoczula/ProductsCatalog/actions/runs/41336446705"
+      }
+    },
+    "bff": {
+      "repository": "MichalBoczula/ECommerceStoreBFF",
+      "commitSha": "3bbbe1c1eb7e76fc60b1bfeebeba613c9477ad7b",
+      "imageReference": "docker.io/mb0101/ecommerce-store-bff-api@sha256:ccf624855827c6ca0d59ffbf4b19459ad0d5899bbe997ba90ecabfd5e528873a",
+      "publication": {
+        "runId": 39057689508,
+        "runAttempt": 1,
+        "jobId": 117469544810,
+        "url": "https://github.com/MichalBoczula/ECommerceStoreBFF/actions/runs/39057689508"
+      }
+    },
+    "web": {
+      "repository": "MichalBoczula/ecommerce-store-web",
+      "commitSha": "a5fe2f3dd0e9eb46be86df8109638c2fccad4277",
+      "imageReference": "docker.io/mb0101/ecommerce-store-web@sha256:d94640a1a6d06defe39f161cdf376a85059f0b11c4523fcb0a3148f85e8dacb0",
+      "publication": {
+        "runId": 41363524595,
+        "runAttempt": 1,
+        "jobId": 125020184648,
+        "url": "https://github.com/MichalBoczula/ecommerce-store-web/actions/runs/41363524595"
+      }
+    },
+    "users": {
+      "repository": "MichalBoczula/ECommerceStoreUsers",
+      "commitSha": "3ddc7828957571605ed40b11b488edd6d332e6ed",
+      "imageReference": "docker.io/mb0101/ecommerce-store-users-api@sha256:c5d1902b42ce7f92377433e2c08aa94440228b7f99acdfc7aa6ccd67b2e550d4",
+      "publication": {
+        "runId": 40569525868,
+        "runAttempt": 1,
+        "jobId": 122421877403,
+        "url": "https://github.com/MichalBoczula/ECommerceStoreUsers/actions/runs/40569525868"
+      }
+    },
+    "orders": {
+      "repository": "MichalBoczula/ECommerceStoreInvoice",
+      "commitSha": "d28dd23c14dee519ac753da6fe2c32289581ca3e",
+      "imageReference": "docker.io/mb0101/ecommerce-store-invoice-api@sha256:6e9244804a2645f8aecaff89f60cff03337a94b70ca877195e585c678f2d996a",
+      "publication": {
+        "runId": 40908053521,
+        "runAttempt": 1,
+        "jobId": 123571769255,
+        "url": "https://github.com/MichalBoczula/ECommerceStoreInvoice/actions/runs/40908053521"
+      }
+    },
+    "payments": {
+      "repository": "MichalBoczula/ECommerceStorePayments",
+      "commitSha": "a250dfe1c8752faebd88f9504367eff91dae699e",
+      "imageReference": "docker.io/mb0101/ecommerce-store-payments-api@sha256:899444d20f3b97c327e7233a7f0c0dee5c4c1574958005546607d9ef2c13e7ca",
+      "publication": {
+        "runId": 41552468058,
+        "runAttempt": 1,
+        "jobId": 125648592251,
+        "url": "https://github.com/MichalBoczula/ECommerceStorePayments/actions/runs/41552468058"
+      }
+    },
+    "livedocs": {
+      "repository": "MichalBoczula/ECommerceStore.LiveDocs",
+      "commitSha": "2f2ca78bc76ac3ae4182ccba7585bde868f6aad1",
+      "imageReference": "docker.io/mb0101/ecommerce-store-livedocs@sha256:c561c2088ed8d9bb2bfc58a793db131b708deb7685a4e0878a79cccfdc1ea5ed",
+      "publication": {
+        "runId": 40982602059,
+        "runAttempt": 1,
+        "jobId": 123826329811,
+        "url": "https://github.com/MichalBoczula/ECommerceStore.LiveDocs/actions/runs/40982602059"
+      },
+      "contentMode": "source-pinned-documentation",
+      "manifestPath": "manifests/portal.json"
+    },
+    "pact": {
+      "repository": "MichalBoczula/ECommerceStore.Pact",
+      "commitSha": "b9730d48c2e7e2d64d26fcd92203badb8319cefc",
+      "imageReference": "docker.io/mb0101/ecommerce-store-pact-api@sha256:a6d5d4ba7477b77499f290fbf4365df8d27fa78429e0e717cfb042bf8dfc1097",
+      "publication": {
+        "runId": 42089870316,
+        "runAttempt": 1,
+        "jobId": 127467840874,
+        "url": "https://github.com/MichalBoczula/ECommerceStore.Pact/actions/runs/42089870316"
+      }
+    },
+    "pact_web": {
+      "repository": "MichalBoczula/ECommerceStore.Pact.Web",
+      "commitSha": "ccb3b8dd8b50ae5f1568c3e8003c40bf1c549c66",
+      "imageReference": "docker.io/mb0101/ecommerce-store-pact-web@sha256:7e45e8610ba733d275b510a685c98b8d68f24b51af9679ee9ac50510115ba553",
+      "publication": {
+        "runId": 41811550291,
+        "runAttempt": 3,
+        "jobId": 127460575651,
+        "url": "https://github.com/MichalBoczula/ECommerceStore.Pact.Web/actions/runs/41811550291"
+      }
+    },
+    "knowledge_api": {
+      "repository": "MichalBoczula/ECommerceStore.KnowledgeAssistant.Api",
+      "commitSha": "cc4cc4eb499085f50724f0010b267a7c3ef58c29",
+      "imageReference": "docker.io/mb0101/ecommerce-store-knowledge-assistant-api@sha256:8f085251753ff0ec32ff352045aa47de135c2ce6d34e001ef9e9a5478ef79e05",
+      "publication": {
+        "runId": 41350958736,
+        "runAttempt": 1,
+        "jobId": 124980931224,
+        "url": "https://github.com/MichalBoczula/ECommerceStore.KnowledgeAssistant.Api/actions/runs/41350958736"
+      },
+      "contentMode": "synthetic-demo"
+    },
+    "knowledge_web": {
+      "repository": "MichalBoczula/ECommerceStore.KnowledgeAssistant.Web",
+      "commitSha": "3135bc96752963519780ca43493ab5ee7fefe2f9",
+      "imageReference": "docker.io/mb0101/ecommerce-store-knowledge-assistant-web@sha256:ec64109c6dc8d22738193390d90250555090bea2a48dd5b89541ee3406384423",
+      "publication": {
+        "runId": 41346209448,
+        "runAttempt": 1,
+        "jobId": 124966849832,
+        "url": "https://github.com/MichalBoczula/ECommerceStore.KnowledgeAssistant.Web/actions/runs/41346209448"
+      }
+    }
+  },
+  "profiles": {
+    "store": {
+      "status": "published",
+      "applications": [
+        "products",
+        "bff",
+        "web",
+        "users",
+        "orders",
+        "payments",
+        "livedocs"
+      ],
+      "terraformSettings": {},
+      "requiredEnvironment": [
+        "TF_VAR_sql_admin_password",
+        "TF_VAR_mongo_admin_password"
+      ]
+    },
+    "store-pact": {
+      "status": "published",
+      "applications": [
+        "products",
+        "bff",
+        "web",
+        "users",
+        "orders",
+        "payments",
+        "livedocs",
+        "pact",
+        "pact_web"
+      ],
+      "terraformSettings": {},
+      "requiredEnvironment": [
+        "TF_VAR_sql_admin_password",
+        "TF_VAR_mongo_admin_password",
+        "TF_VAR_pact_publisher_token_sha256"
+      ]
+    },
+    "store-pact-search": {
+      "status": "published",
+      "applications": [
+        "products",
+        "bff",
+        "web",
+        "users",
+        "orders",
+        "payments",
+        "livedocs",
+        "pact",
+        "pact_web"
+      ],
+      "terraformSettings": {
+        "knowledge_search_enabled": true
+      },
+      "requiredEnvironment": [
+        "TF_VAR_sql_admin_password",
+        "TF_VAR_mongo_admin_password",
+        "TF_VAR_pact_publisher_token_sha256"
+      ]
+    },
+    "full-demo": {
+      "status": "published",
+      "applications": [
+        "products",
+        "bff",
+        "web",
+        "users",
+        "orders",
+        "payments",
+        "livedocs",
+        "pact",
+        "pact_web",
+        "knowledge_api",
+        "knowledge_web"
+      ],
+      "terraformSettings": {
+        "knowledge_runtime_mode": "demo"
+      },
+      "requiredEnvironment": [
+        "TF_VAR_sql_admin_password",
+        "TF_VAR_mongo_admin_password",
+        "TF_VAR_pact_publisher_token_sha256",
+        "TF_VAR_knowledge_api_key"
+      ]
+    },
+    "full-azure": {
+      "status": "requires-knowledge-refresh",
+      "applications": [
+        "products",
+        "bff",
+        "web",
+        "users",
+        "orders",
+        "payments",
+        "livedocs",
+        "pact",
+        "pact_web",
+        "knowledge_api",
+        "knowledge_web"
+      ],
+      "terraformSettings": {
+        "knowledge_search_enabled": true,
+        "knowledge_runtime_mode": "azure"
+      },
+      "requiredEnvironment": [
+        "TF_VAR_sql_admin_password",
+        "TF_VAR_mongo_admin_password",
+        "TF_VAR_pact_publisher_token_sha256",
+        "TF_VAR_knowledge_api_key",
+        "TF_VAR_knowledge_openai_api_key"
+      ],
+      "requiredReleaseHandoff": "knowledge-refresh-handoff/release.json"
+    }
+  },
+  "pactPublishers": {
+    "payments-ci": [
+      "payments"
+    ],
+    "invoice-ci": [
+      "invoice"
+    ]
+  }
+}
