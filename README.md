@@ -1,7 +1,12 @@
 # ECommerceStore — simple Azure infrastructure
 
-One Terraform root, one state, one variables file. Plain Terraform and Azure CLI;
-no deployment wrappers, Python scripts, test framework, CI/CD or custom VNet.
+One Terraform root, one state, one private variables file. Deploy with Terraform
+and Azure CLI; GitHub Actions checks the configuration without deploying it.
+
+For an existing deployment, start with the [release inventory](docs/release-inventory.md)
+and the [delivery plan](docs/delivery-plan.md). The numbered walkthroughs below
+retain historical bootstrap examples and image pins. Select current images from
+the inventory and keep your existing backend and `terraform.tfvars`.
 
 ## Resources
 
@@ -13,7 +18,7 @@ is no automatic fallback to a paid database tier.
 | --- | ---: | --- |
 | Resource group | 1 | `rg-ecommercestore-dev` |
 | Container Apps environment | 1 | Consumption; Azure-managed network; live logs only |
-| Container Apps | Up to 7 | Products, BFF, Web, Users, Orders/Invoices, Payments, LiveDocs; public HTTPS; 0–1 replicas each |
+| Container Apps | Up to 11 | Store, LiveDocs, Pact API/Web, Knowledge API/Web; HTTPS ingress; 0–1 replicas each |
 | SQL logical server | 1 | Password authentication; public endpoint |
 | SQL database | 1 | `products`; Free offer; serverless; pause at monthly free limit |
 | DocumentDB cluster | 1 | MongoDB-compatible; Free; 32 GB; no HA |
@@ -21,6 +26,7 @@ is no automatic fallback to a paid database tier.
 | Photo container | 1 | `photos`; anonymous blob reads; authenticated writes |
 | Invoice container | 1 | `invoices`; private; application uploads/downloads |
 | Documentation container | 1 | `livedocs`; private; source bundles for later CI integration |
+| Azure AI Search | 0–1 | Opt-in Free service for the Knowledge vector index |
 
 This is **16 core resources with all seven apps enabled**, plus two required database
 firewall rules: **18 Terraform resource instances**. The rules allow Azure services
@@ -37,6 +43,9 @@ still required. There are no Internet-wide database firewall rules or outbound I
 | Products + BFF + Web + Users + Orders/Invoices | 16 |
 | All six store apps, including Payments | 17 |
 | All seven, including LiveDocs | 18 |
+| Store + LiveDocs + Pact API/Web | 20 |
+| All eleven apps without Search | 22 |
+| All eleven apps with Search | 23 |
 
 Counts exclude provider registrations, Azure-managed supporting resources and the
 existing state storage. Resource names and passwords stay stable between runs.
