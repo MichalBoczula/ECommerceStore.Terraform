@@ -19,3 +19,6 @@ jobs:
       - run: terraform init -backend=false -input=false -lockfile=readonly
       - run: terraform validate -no-color
       - run: terraform test -no-color
+      - name: Test the deployment verifier with CLI fixtures
+        shell: pwsh
+        run: ./tests/Test-PortfolioDeployment.ps1
