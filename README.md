@@ -837,22 +837,10 @@ az containerapp logs show --name ca-ecommercestore-payments-dev --resource-group
 
 ### Stripe checkout and invoice fulfillment are a separate deployment step
 
-This minimal API deployment deliberately follows the app's disabled Stripe baseline.
-`POST /payments/{order_id}/checkout` returns 503 `checkout_disabled` until test checkout
-is configured. The app requires a test API key, fixed frontend return URLs and an
-endpoint-specific webhook signing secret. GitHub Actions secrets do not automatically
-become ACA runtime settings. Register the Payments HTTPS webhook URL in Stripe test
-mode and follow the app's [checkout](https://github.com/MichalBoczula/ECommerceStorePayments/blob/main/docs/stripe-checkout.md)
-and [webhook](https://github.com/MichalBoczula/ECommerceStorePayments/blob/main/docs/stripe-webhooks.md)
-runbooks before enabling it.
-
-The API stores verified success and durable fulfillment work. It does not start the
-one-shot fulfillment worker in the background. Automatic **Succeeded payment → Paid
-order → invoice** additionally needs the app's
-[scheduled ACA Job](https://github.com/MichalBoczula/ECommerceStorePayments/blob/main/docs/payment-fulfillment.md),
-using the same image and Mongo/Orders settings. That job and Stripe runtime secrets
-are outside this one-ACA Pay/Get step. Browser success navigation and API readiness
-alone do not establish completed payment or invoice delivery.
+Stripe is disabled by default. Follow the [TF/04 Stripe runtime runbook](docs/stripe-runtime.md)
+to wire the sandbox credentials, register the webhook and verify payment confirmation.
+TF/05 adds the [scheduled fulfillment job](https://github.com/MichalBoczula/ECommerceStorePayments/blob/main/docs/payment-fulfillment.md)
+that marks confirmed orders Paid and creates their invoices.
 
 ## 10. Deploy the empty LiveDocs portal
 

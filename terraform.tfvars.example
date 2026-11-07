@@ -8,6 +8,10 @@ app_images = {}
 # section 8, with DocumentDB readiness and private Blob PDF storage support.
 # Add payments using the verified mb0101/ecommerce-store-payments-api digest in
 # README section 9. It reuses Mongo and requires the orders image to stay enabled.
+# See docs/stripe-runtime.md before enabling Stripe test checkout.
+# payments_stripe_enabled = true
+# Supply Stripe credentials through TF_VAR_payments_stripe_secret_key and
+# TF_VAR_payments_stripe_webhook_secret in your private deployment shell.
 # Add livedocs using the verified mb0101/ecommerce-store-livedocs digest in README
 # section 10. CI will use the private livedocs container; the host serves its image.
 
