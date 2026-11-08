@@ -1,4 +1,11 @@
 locals {
+  payments_data_env = {
+    PAYMENTS_ENVIRONMENT                = "production"
+    PAYMENTS_MONGODB_DATABASE_NAME      = "ecommerce-store-payments-db"
+    PAYMENTS_ORDERS_API_BASE_URL        = local.app_urls.orders
+    PAYMENTS_ORDERS_API_TIMEOUT_SECONDS = "30"
+  }
+
   # Each entry describes the existing application's container contract.
   app_config = {
     products = {
@@ -85,12 +92,8 @@ locals {
       port       = 8080
       live_path  = "/health/live"
       ready_path = "/health/ready"
-      env = merge({
-        PAYMENTS_ENVIRONMENT                = "production"
-        PAYMENTS_MONGODB_DATABASE_NAME      = "ecommerce-store-payments-db"
-        PAYMENTS_ORDERS_API_BASE_URL        = local.app_urls.orders
-        PAYMENTS_ORDERS_API_TIMEOUT_SECONDS = "30"
-        PAYMENTS_STRIPE_ENABLED             = tostring(var.payments_stripe_enabled)
+      env = merge(local.payments_data_env, {
+        PAYMENTS_STRIPE_ENABLED = tostring(var.payments_stripe_enabled)
         }, var.payments_stripe_enabled ? {
         PAYMENTS_STRIPE_SUCCESS_URL = "${local.app_urls.web}/orders?checkout=success"
         PAYMENTS_STRIPE_CANCEL_URL  = "${local.app_urls.web}/orders?checkout=cancel"

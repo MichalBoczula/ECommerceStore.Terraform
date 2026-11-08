@@ -839,8 +839,8 @@ az containerapp logs show --name ca-ecommercestore-payments-dev --resource-group
 
 Stripe is disabled by default. Follow the [TF/04 Stripe runtime runbook](docs/stripe-runtime.md)
 to wire the sandbox credentials, register the webhook and verify payment confirmation.
-TF/05 adds the [scheduled fulfillment job](https://github.com/MichalBoczula/ECommerceStorePayments/blob/main/docs/payment-fulfillment.md)
-that marks confirmed orders Paid and creates their invoices.
+Follow the [TF/05 fulfillment runbook](docs/payment-fulfillment.md) to enable the
+scheduled job that marks confirmed orders Paid and creates their invoices.
 
 ## 10. Deploy the empty LiveDocs portal
 

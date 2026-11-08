@@ -42,3 +42,8 @@ output "app_urls" {
   description = "Only apps enabled in app_images are listed."
   value       = { for name, app in azurerm_container_app.app : name => "https://${app.ingress[0].fqdn}" }
 }
+
+output "payments_fulfillment_job_name" {
+  description = "The scheduled Payments fulfillment job, when enabled."
+  value       = one(azurerm_container_app_job.payments_fulfillment[*].name)
+}
