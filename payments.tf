@@ -13,6 +13,13 @@ variable "payments_stripe_enabled" {
   }
 }
 
+variable "payments_stripe_checkout_vat_enabled" {
+  description = "Include the Invoice service's sandbox VAT in new Stripe attempts. Enable after both Payments runtimes use a VAT-capable image."
+  type        = bool
+  default     = false
+  nullable    = false
+}
+
 variable "payments_stripe_secret_key" {
   description = "Stripe sandbox sk_test_ API key for Payments checkout. Supply through TF_VAR_payments_stripe_secret_key."
   type        = string

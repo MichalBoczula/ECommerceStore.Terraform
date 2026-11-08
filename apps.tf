@@ -97,6 +97,8 @@ locals {
         }, var.payments_stripe_enabled ? {
         PAYMENTS_STRIPE_SUCCESS_URL = "${local.app_urls.web}/orders?checkout=success"
         PAYMENTS_STRIPE_CANCEL_URL  = "${local.app_urls.web}/orders?checkout=cancel"
+        } : {}, var.payments_stripe_enabled && var.payments_stripe_checkout_vat_enabled ? {
+        PAYMENTS_STRIPE_CHECKOUT_VAT_ENABLED = "true"
       } : {})
       secrets = merge({
         "database-connection" = local.users_connection_string

@@ -10,6 +10,8 @@ app_images = {}
 # README section 9. It reuses Mongo and requires the orders image to stay enabled.
 # See docs/stripe-runtime.md before enabling Stripe test checkout.
 # payments_stripe_enabled = true
+# After deploying the VAT-capable Payments API and fulfillment job:
+# payments_stripe_checkout_vat_enabled = true
 # Supply Stripe credentials through TF_VAR_payments_stripe_secret_key and
 # TF_VAR_payments_stripe_webhook_secret in your private deployment shell.
 # See docs/payment-fulfillment.md before enabling the scheduled worker.

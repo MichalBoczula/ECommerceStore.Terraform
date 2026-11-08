@@ -98,6 +98,23 @@ browser tab. Payments confirms the payment from Stripe's signed webhook.
    same inputs. Expect exit code 0. Keep the nonsecret revision, order, session
    and event IDs and the result of the replay check as acceptance evidence.
 
+## Enable VAT for new sandbox attempts
+
+Upgrade `app_images.payments` to the published VAT-capable digest and apply it
+with `payments_stripe_checkout_vat_enabled = false`. Verify the active Payments
+API revision and fulfillment job template both use that digest. Wait for older
+executions to finish and confirm an execution using the updated template
+completes before enabling VAT. Older worker images cannot fulfill new
+VAT-enabled receipts.
+
+Then set `payments_stripe_checkout_vat_enabled = true` in the private inputs,
+review a new plan, and apply the Payments API configuration update. Create a
+fresh sandbox order. For a 4,998.00 PLN subtotal, verify Stripe charges
+6,147.54 PLN, the signed webhook records `amount_minor = 614754`, and the
+completed invoice PDF shows the same total. Existing sessions keep their
+original amount and existing invoices remain as issued. Keep a VAT-capable
+image for both runtimes while any VAT-enabled attempts are outstanding.
+
 ## Pause checkout or rotate credentials
 
 Set `payments_stripe_enabled = false` and review and apply a new plan to stop new

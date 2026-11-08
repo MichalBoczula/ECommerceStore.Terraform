@@ -23,10 +23,16 @@ $orderId = [guid](Read-Host 'Succeeded sandbox payment order ID')
 
 $order = Invoke-RestMethod "$backend/orders/$orderId" -TimeoutSec 180
 $payment = Invoke-RestMethod "$backend/payments/order/$orderId" -TimeoutSec 180
+$expectedMinor = [decimal]$order.totalAmount * 100
+# Set to true only if this attempt was created with checkout VAT enabled.
+$vatEnabledForAttempt = $false
+if ($vatEnabledForAttempt) {
+    $expectedMinor += [Math]::Round($expectedMinor * 0.23d, 0, [MidpointRounding]::ToEven)
+}
 if (-not $order.clientId -or $order.status -ne 'Created' -or
     $payment.status -ne 'succeeded' -or $payment.order_id -ne $orderId.ToString() -or
     $payment.provider_session_id -notlike 'cs_test_*' -or
-    $payment.currency -ne 'PLN' -or $payment.amount_minor -ne ([decimal]$order.totalAmount * 100)) {
+    $payment.currency -ne 'PLN' -or $payment.amount_minor -ne $expectedMinor) {
     throw 'Expected a Created order and its matching succeeded sandbox payment.'
 }
 
@@ -45,10 +51,10 @@ $clientData = Invoke-WebRequest "$backend/client-data-versions/client/$clientId"
 if ($clientData.StatusCode -eq 404) {
     $body = @{
         clientName = 'Checkout Demo'
-        addressEmail = 'checkout-demo@example.com'
+        addressEmail = 'checkout.demo@example.com'
         postalCode = '00-001'
         city = 'Warsaw'
-        street = 'Main Street'
+        street = 'Main.Street'
         buildingNumber = '10'
         apartmentNumber = '2'
         phonePrefix = '48'
