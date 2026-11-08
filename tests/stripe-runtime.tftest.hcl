@@ -44,9 +44,10 @@ run "stripe_is_off_by_default" {
 run "stripe_checkout_uses_store_returns_and_payments_only_secret_references" {
   command = plan
   variables {
-    payments_stripe_enabled        = true
-    payments_stripe_secret_key     = "sk_test_synthetic"
-    payments_stripe_webhook_secret = "whsec_synthetic"
+    payments_stripe_enabled              = true
+    payments_stripe_checkout_vat_enabled = true
+    payments_stripe_secret_key           = "sk_test_synthetic"
+    payments_stripe_webhook_secret       = "whsec_synthetic"
   }
 
   assert {
@@ -55,11 +56,12 @@ run "stripe_checkout_uses_store_returns_and_payments_only_secret_references" {
       env.name => { value = env.value, secret_name = env.secret_name }
       if startswith(env.name, "PAYMENTS_STRIPE_")
       }) == tomap({
-      PAYMENTS_STRIPE_ENABLED        = { value = "true", secret_name = null }
-      PAYMENTS_STRIPE_SUCCESS_URL    = { value = "https://ca-ecommercestore-web-dev.synthetic.francecentral.azurecontainerapps.io/orders?checkout=success", secret_name = null }
-      PAYMENTS_STRIPE_CANCEL_URL     = { value = "https://ca-ecommercestore-web-dev.synthetic.francecentral.azurecontainerapps.io/orders?checkout=cancel", secret_name = null }
-      PAYMENTS_STRIPE_SECRET_KEY     = { value = null, secret_name = "stripe-api-key" }
-      PAYMENTS_STRIPE_WEBHOOK_SECRET = { value = null, secret_name = "stripe-webhook-secret" }
+      PAYMENTS_STRIPE_ENABLED              = { value = "true", secret_name = null }
+      PAYMENTS_STRIPE_CHECKOUT_VAT_ENABLED = { value = "true", secret_name = null }
+      PAYMENTS_STRIPE_SUCCESS_URL          = { value = "https://ca-ecommercestore-web-dev.synthetic.francecentral.azurecontainerapps.io/orders?checkout=success", secret_name = null }
+      PAYMENTS_STRIPE_CANCEL_URL           = { value = "https://ca-ecommercestore-web-dev.synthetic.francecentral.azurecontainerapps.io/orders?checkout=cancel", secret_name = null }
+      PAYMENTS_STRIPE_SECRET_KEY           = { value = null, secret_name = "stripe-api-key" }
+      PAYMENTS_STRIPE_WEBHOOK_SECRET       = { value = null, secret_name = "stripe-webhook-secret" }
     })
     error_message = "Checkout must return to the deployed store and read both credentials from named secrets."
   }
