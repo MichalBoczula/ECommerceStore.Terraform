@@ -35,7 +35,8 @@ run "stripe_is_off_by_default" {
       tomap({ for env in azurerm_container_app.app["payments"].template[0].container[0].env :
         env.name => env.value if startswith(env.name, "PAYMENTS_STRIPE_")
       }) == tomap({ PAYMENTS_STRIPE_ENABLED = "false" }) &&
-      toset([for secret in azurerm_container_app.app["payments"].secret : secret.name]) == toset(["database-connection"])
+      toset([for secret in azurerm_container_app.app["payments"].secret : secret.name]) ==
+      toset(["application-insights", "database-connection"])
     )
     error_message = "The existing Pay/Get deployment must keep checkout off and require no Stripe secrets."
   }
@@ -69,7 +70,7 @@ run "stripe_checkout_uses_store_returns_and_payments_only_secret_references" {
   assert {
     condition = (
       toset([for secret in azurerm_container_app.app["payments"].secret : secret.name]) ==
-      toset(["database-connection", "stripe-api-key", "stripe-webhook-secret"]) &&
+      toset(["application-insights", "database-connection", "stripe-api-key", "stripe-webhook-secret"]) &&
       alltrue([for name, app in azurerm_container_app.app : alltrue([
         for secret in app.secret : !startswith(secret.name, "stripe-")
       ]) if name != "payments"])
@@ -95,7 +96,7 @@ run "stripe_webhook_can_receive_while_checkout_is_paused" {
         PAYMENTS_STRIPE_WEBHOOK_SECRET = { value = null, secret_name = "stripe-webhook-secret" }
       }) &&
       toset([for secret in azurerm_container_app.app["payments"].secret : secret.name]) ==
-      toset(["database-connection", "stripe-api-key", "stripe-webhook-secret"])
+      toset(["application-insights", "database-connection", "stripe-api-key", "stripe-webhook-secret"])
     )
     error_message = "Pausing must keep signed webhook delivery active and allow the API secret to be removed separately."
   }

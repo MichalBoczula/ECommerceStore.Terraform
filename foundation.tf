@@ -33,9 +33,9 @@ resource "azurerm_container_app_environment" "store" {
   resource_group_name   = azurerm_resource_group.store.name
   location              = var.location
   public_network_access = "Enabled"
+  logs_destination      = "azure-monitor"
   tags                  = local.tags
 
-  # No custom VNet and no saved logs. The built-in live log stream still works.
   workload_profile {
     name                  = "Consumption"
     workload_profile_type = "Consumption"

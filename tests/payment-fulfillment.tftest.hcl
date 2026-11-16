@@ -77,12 +77,13 @@ run "fulfillment_uses_the_payments_release_and_shared_data_settings" {
       tomap({
         for env in one(azurerm_container_app_job.payments_fulfillment[0].template[0].container).env :
         env.name => { value = env.value, secret_name = env.secret_name }
+        if env.name != "OTEL_SERVICE_NAME"
         }) == tomap({
         for env in azurerm_container_app.app["payments"].template[0].container[0].env :
         env.name => { value = env.value, secret_name = env.secret_name }
-        if !startswith(env.name, "PAYMENTS_STRIPE_")
+        if !startswith(env.name, "PAYMENTS_STRIPE_") && env.name != "OTEL_SERVICE_NAME"
       }) &&
-      toset([for secret in azurerm_container_app_job.payments_fulfillment[0].secret : secret.name]) == toset(["database-connection"]) &&
+      toset([for secret in azurerm_container_app_job.payments_fulfillment[0].secret : secret.name]) == toset(["application-insights", "database-connection"]) &&
       length(azurerm_container_app_job.payments_fulfillment[0].registry) == 0
     )
     error_message = "The job must share Payments' MongoDB and Orders settings without receiving Stripe credentials."
@@ -100,7 +101,7 @@ run "fulfillment_supports_the_existing_registry_pull_token" {
   assert {
     condition = (
       toset([for secret in azurerm_container_app_job.payments_fulfillment[0].secret : secret.name]) ==
-      toset(["database-connection", "dockerhub-token"]) &&
+      toset(["application-insights", "database-connection", "dockerhub-token"]) &&
       one(azurerm_container_app_job.payments_fulfillment[0].registry).server == "docker.io" &&
       one(azurerm_container_app_job.payments_fulfillment[0].registry).username == var.dockerhub_username &&
       one(azurerm_container_app_job.payments_fulfillment[0].registry).password_secret_name == "dockerhub-token"

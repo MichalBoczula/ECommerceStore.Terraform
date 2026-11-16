@@ -28,6 +28,11 @@ resource "azurerm_container_app_job" "payments_fulfillment" {
     value = local.users_connection_string
   }
 
+  secret {
+    name  = local.application_insights_secret_name
+    value = azurerm_application_insights.store.connection_string
+  }
+
   dynamic "secret" {
     for_each = var.dockerhub_token == null ? [] : ["dockerhub-token"]
     content {
@@ -65,6 +70,16 @@ resource "azurerm_container_app_job" "payments_fulfillment" {
       env {
         name        = "PAYMENTS_MONGODB_CONNECTION_STRING"
         secret_name = "database-connection"
+      }
+
+      env {
+        name        = "APPLICATIONINSIGHTS_CONNECTION_STRING"
+        secret_name = local.application_insights_secret_name
+      }
+
+      env {
+        name  = "OTEL_SERVICE_NAME"
+        value = "ecommercestore-payments-fulfillment"
       }
     }
   }
