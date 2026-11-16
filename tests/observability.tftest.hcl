@@ -47,25 +47,37 @@ run "checkout_telemetry_uses_the_dev_workspace" {
 
   assert {
     condition = alltrue([
-      for name, app in azurerm_container_app.app : toset([
-        for env in app.template[0].container[0].env : env.name
-        if (
-          (env.name == "APPLICATIONINSIGHTS_CONNECTION_STRING" && env.secret_name == "application-insights" && env.value == null) ||
-          (env.name == "OTEL_SERVICE_NAME" && env.value == "ecommercestore-${name}")
-        )
-      ]) == (contains(["bff", "orders", "payments", "products"], name) ? toset(["APPLICATIONINSIGHTS_CONNECTION_STRING", "OTEL_SERVICE_NAME"]) : toset([]))
+      for name in ["bff", "orders", "payments", "products"] : (
+        anytrue([for env in azurerm_container_app.app[name].template[0].container[0].env :
+          env.name == "APPLICATIONINSIGHTS_CONNECTION_STRING" && env.secret_name == "application-insights" && env.value == null
+        ]) &&
+        anytrue([for env in azurerm_container_app.app[name].template[0].container[0].env :
+          env.name == "OTEL_SERVICE_NAME" && env.value == "ecommercestore-${name}"
+        ])
+      )
     ])
-    error_message = "Only the checkout backends must receive the Application Insights secret reference and their own telemetry service name."
+    error_message = "Checkout backends must receive the Application Insights secret reference and their own telemetry service name."
   }
 
   assert {
-    condition = toset([
-      for env in one(azurerm_container_app_job.payments_fulfillment[0].template[0].container).env : env.name
-      if (
-        (env.name == "APPLICATIONINSIGHTS_CONNECTION_STRING" && env.secret_name == "application-insights" && env.value == null) ||
-        (env.name == "OTEL_SERVICE_NAME" && env.value == "ecommercestore-payments-fulfillment")
-      )
-    ]) == toset(["APPLICATIONINSIGHTS_CONNECTION_STRING", "OTEL_SERVICE_NAME"])
+    condition = alltrue([
+      for name in ["users", "web"] : alltrue([
+        for env in azurerm_container_app.app[name].template[0].container[0].env :
+        !contains(["APPLICATIONINSIGHTS_CONNECTION_STRING", "OTEL_SERVICE_NAME"], env.name)
+      ])
+    ])
+    error_message = "Checkout backend telemetry must be scoped to the checkout services."
+  }
+
+  assert {
+    condition = (
+      anytrue([for env in one(azurerm_container_app_job.payments_fulfillment[0].template[0].container).env :
+        env.name == "APPLICATIONINSIGHTS_CONNECTION_STRING" && env.secret_name == "application-insights" && env.value == null
+      ]) &&
+      anytrue([for env in one(azurerm_container_app_job.payments_fulfillment[0].template[0].container).env :
+        env.name == "OTEL_SERVICE_NAME" && env.value == "ecommercestore-payments-fulfillment"
+      ])
+    )
     error_message = "The fulfillment worker must receive the Application Insights secret reference and its own telemetry service name."
   }
 }
