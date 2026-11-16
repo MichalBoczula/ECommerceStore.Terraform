@@ -209,7 +209,12 @@ resource "azurerm_container_app" "app" {
   tags                         = local.tags
 
   dynamic "secret" {
-    for_each = local.app_config[each.key].secrets
+    for_each = merge(
+      local.app_config[each.key].secrets,
+      contains(local.checkout_telemetry_apps, each.key) ? {
+        (local.application_insights_secret_name) = azurerm_application_insights.store.connection_string
+      } : {},
+    )
     content {
       name  = secret.key
       value = secret.value
@@ -270,7 +275,12 @@ resource "azurerm_container_app" "app" {
       memory = contains(["orders", "pact"], each.key) ? "1Gi" : "0.5Gi"
 
       dynamic "env" {
-        for_each = local.app_config[each.key].env
+        for_each = merge(
+          local.app_config[each.key].env,
+          contains(local.checkout_telemetry_apps, each.key) ? {
+            OTEL_SERVICE_NAME = "ecommercestore-${each.key}"
+          } : {},
+        )
         content {
           name  = env.key
           value = env.value
@@ -278,7 +288,12 @@ resource "azurerm_container_app" "app" {
       }
 
       dynamic "env" {
-        for_each = local.app_config[each.key].secret_env
+        for_each = merge(
+          local.app_config[each.key].secret_env,
+          contains(local.checkout_telemetry_apps, each.key) ? {
+            APPLICATIONINSIGHTS_CONNECTION_STRING = local.application_insights_secret_name
+          } : {},
+        )
         content {
           name        = env.key
           secret_name = env.value

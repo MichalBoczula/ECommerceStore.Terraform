@@ -31,7 +31,9 @@ provider "azurerm" {
   resource_providers_to_register = concat([
     "Microsoft.App",
     "Microsoft.DocumentDB",
+    "Microsoft.Insights",
     "Microsoft.Network",
+    "Microsoft.OperationalInsights",
     "Microsoft.Sql",
     "Microsoft.Storage",
   ], var.knowledge_search_enabled ? ["Microsoft.Search"] : [])

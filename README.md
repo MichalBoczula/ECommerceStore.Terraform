@@ -19,8 +19,11 @@ is no automatic fallback to a paid database tier.
 | Resource | Count | Configuration |
 | --- | ---: | --- |
 | Resource group | 1 | `rg-ecommercestore-dev` |
-| Container Apps environment | 1 | Consumption; Azure-managed network; live logs only |
+| Container Apps environment | 1 | Consumption; Azure-managed network; logs routed through Azure Monitor |
 | Container Apps | Up to 11 | Store, LiveDocs, Pact API/Web, Knowledge API/Web; HTTPS ingress; 0–1 replicas each |
+| Log Analytics workspace | 1 | Stores Container Apps logs and Application Insights telemetry |
+| Application Insights | 1 | Workspace-based; checkout service and fulfillment telemetry |
+| Container Apps diagnostic setting | 1 | Routes environment console and system logs to the workspace |
 | SQL logical server | 1 | Password authentication; public endpoint |
 | SQL database | 1 | `products`; Free offer; serverless; pause at monthly free limit |
 | DocumentDB cluster | 1 | MongoDB-compatible; Free; 32 GB; no HA |
@@ -30,31 +33,41 @@ is no automatic fallback to a paid database tier.
 | Documentation container | 1 | `livedocs`; private; source bundles for later CI integration |
 | Azure AI Search | 0–1 | Opt-in Free service for the Knowledge vector index |
 
-This is **16 core resources with all seven apps enabled**, plus two required database
-firewall rules: **18 Terraform resource instances**. The rules allow Azure services
+This is **19 core resources with all seven apps enabled**, plus two required database
+firewall rules: **21 Terraform resource instances**. The rules allow Azure services
 to attempt connections, including other subscriptions; database authentication is
 still required. There are no Internet-wide database firewall rules or outbound IP scripts.
 
 | Apps in `app_images` | Resources on a fresh deployment |
 | --- | ---: |
-| None — first apply | 11 |
-| Products | 12 |
-| Products + Users | 13 |
-| Products + Users + BFF | 14 |
-| Products + BFF + Web + Users | 15 |
-| Products + BFF + Web + Users + Orders/Invoices | 16 |
-| All six store apps, including Payments | 17 |
-| All seven, including LiveDocs | 18 |
-| Store + LiveDocs + Pact API/Web | 20 |
-| All eleven apps without Search | 22 |
-| All eleven apps with Search | 23 |
+| None — first apply | 14 |
+| Products | 15 |
+| Products + Users | 16 |
+| Products + Users + BFF | 17 |
+| Products + BFF + Web + Users | 18 |
+| Products + BFF + Web + Users + Orders/Invoices | 19 |
+| All six store apps, including Payments | 20 |
+| All seven, including LiveDocs | 21 |
+| Store + LiveDocs + Pact API/Web | 23 |
+| All eleven apps without Search | 25 |
+| All eleven apps with Search | 26 |
 
 Counts exclude provider registrations, Azure-managed supporting resources and the
 existing state storage. Resource names and passwords stay stable between runs.
 The invoice and LiveDocs containers are part of the foundation even while their
-apps are disabled. The six-app store before the LiveDocs addition has 16 instances;
-adding the documentation container and host takes that existing deployment to 18.
-Plans upgrading older states also create any missing foundation containers.
+apps are disabled. Plans upgrading older states also create any missing
+foundation containers and monitoring resources.
+
+### DEV observability
+
+On an existing DEV deployment, review the plan for three new monitoring
+resources, an in-place update to the environment's log destination, and
+configuration updates to deployed checkout apps and the enabled fulfillment job.
+Open **Logs** on `law-ecommercestore-dev` to inspect the persisted console and
+system logs. `appi-ecommercestore-dev` uses the same workspace. Terraform provides
+the connection string through Container Apps secrets and assigns a service name
+to BFF, Products, Orders, Payments, and fulfillment. Each app will emit
+distributed traces after its OpenTelemetry instrumentation is deployed.
 
 ## 1. Prepare
 
@@ -114,7 +127,7 @@ terraform plan "-out=deploy.tfplan"
 Run the commands one at a time and stop if one fails. In PowerShell, quote the whole
 `"-out=deploy.tfplan"` argument to keep it as one native command-line argument.
 
-Review: expect **11 additions**, no deletion or migration of old infrastructure.
+Review the plan for **14 additions** on a first apply with no apps.
 Apply the reviewed plan:
 
 ```powershell
@@ -127,9 +140,9 @@ deployment-stage scripts or `-auto-approve` are needed. The first apply creates 
 databases, storage and empty ACA environment; it deploys no placeholder containers.
 
 SQL Free pauses at its monthly limit. DocumentDB Free has no backup/restore or SLA
-and may pause after 60 days of inactivity. Storage and active ACA usage can cost
-money. Scale-to-zero removes idle replicas, not every subscription charge. Console
-logs can be viewed live but are not retained.
+and may pause after 60 days of inactivity. Storage, active ACA usage and log
+ingestion can cost money. Scale-to-zero removes idle replicas, not every
+subscription charge. The Log Analytics workspace has a 30-day default retention.
 
 ## 3. Upload photos
 
