@@ -122,7 +122,7 @@ locals {
       env = merge({
         KA_CORPUS_PATH     = "/app/data/corpus.json"
         KA_RETRIEVAL_MODE  = var.knowledge_runtime_mode == "demo" ? "local" : "azure"
-        KA_GENERATION_MODE = var.knowledge_runtime_mode == "demo" ? "evidence" : "azure"
+        KA_GENERATION_MODE = var.knowledge_runtime_mode == "demo" ? "evidence" : (local.knowledge_foundry_enabled ? "foundry" : "azure")
         }, var.knowledge_runtime_mode == "azure" ? {
         KA_SEARCH_ENDPOINT      = try("https://${azurerm_search_service.knowledge[0].name}.search.windows.net", "")
         KA_SEARCH_INDEX         = var.knowledge_search_index
@@ -131,6 +131,10 @@ locals {
         KA_EMBEDDING_DIMENSIONS = tostring(var.knowledge_models.embedding_dimensions)
         KA_EMBEDDING_REVISION   = var.knowledge_embedding_revision
         KA_CHAT_DEPLOYMENT      = var.knowledge_models.chat_deployment
+        } : {}, local.knowledge_foundry_enabled ? {
+        KA_FOUNDRY_PROJECT_ENDPOINT = var.knowledge_foundry_agent.project_endpoint
+        KA_FOUNDRY_AGENT_NAME       = var.knowledge_foundry_agent.agent_name
+        KA_MAX_OUTPUT_TOKENS        = tostring(var.knowledge_foundry_agent.max_output_tokens)
       } : {})
       secrets = merge({
         "knowledge-api-key" = var.knowledge_api_key
@@ -207,6 +211,13 @@ resource "azurerm_container_app" "app" {
   workload_profile_name        = "Consumption"
   revision_mode                = "Single"
   tags                         = local.tags
+
+  dynamic "identity" {
+    for_each = each.key == "knowledge_api" && var.knowledge_foundry_agent != null ? [1] : []
+    content {
+      type = "SystemAssigned"
+    }
+  }
 
   dynamic "secret" {
     for_each = merge(

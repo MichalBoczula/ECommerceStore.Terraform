@@ -1123,6 +1123,32 @@ separately and model calls have their own usage charges. Source ingestion uses t
 selected immutable manifest, not the newest Blob. Actual index statistics determine
 Free capacity; archive ZIP sizes cannot be compared directly with its 50 MB limit.
 
+### Use a saved Foundry agent for answers
+
+Add the Foundry project and agent to the deployment's `terraform.tfvars`.
+
+```hcl
+knowledge_foundry_agent = {
+  project_endpoint  = "https://<resource>.services.ai.azure.com/api/projects/<project>"
+  agent_name        = "ecommerce-knowledge-assistant"
+  enabled           = false
+  max_output_tokens = 6000
+}
+```
+
+1. Apply with `enabled = false` to provision the Knowledge API's system-assigned
+   identity while it continues to use the current model deployment.
+2. In Foundry, pin the tested agent version and assign **Foundry Agent Consumer**
+   on the agent to that identity. The API authenticates with Microsoft Entra ID.
+   See [agent endpoint authorization](https://learn.microsoft.com/azure/foundry/agents/concepts/agent-endpoint-authorization).
+3. Set `enabled = true` and use the API image reference from the **Refresh Knowledge**
+   handoff for the release that supports Foundry. After applying, query through
+   Knowledge Web and check the answer, source links, and the Foundry trace.
+
+The agent handles answer generation. The API continues to use the existing Search
+index and embedding deployment. Set `enabled = false` to switch generation back to
+the configured chat deployment.
+
 ### Validate Knowledge changes before deployment
 
 CI requires formatting, full configuration validation and mocked plans for disabled

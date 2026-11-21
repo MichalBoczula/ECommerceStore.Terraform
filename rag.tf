@@ -75,6 +75,31 @@ variable "knowledge_openai_api_key" {
   default     = null
 }
 
+variable "knowledge_foundry_agent" {
+  description = "Optional saved Foundry agent for Knowledge API generation. Configure it with enabled=false to provision the identity before granting agent access."
+  type = object({
+    project_endpoint  = string
+    agent_name        = string
+    enabled           = optional(bool, false)
+    max_output_tokens = optional(number, 6000)
+  })
+  default = null
+
+  validation {
+    condition = var.knowledge_foundry_agent == null ? true : (
+      can(regex("^https://[a-z0-9-]+\\.services\\.ai\\.azure\\.com/api/projects/[A-Za-z0-9_-]+/?$", var.knowledge_foundry_agent.project_endpoint)) &&
+      can(regex("^[A-Za-z0-9][A-Za-z0-9_-]*$", var.knowledge_foundry_agent.agent_name)) &&
+      var.knowledge_foundry_agent.max_output_tokens >= 1 &&
+      floor(var.knowledge_foundry_agent.max_output_tokens) == var.knowledge_foundry_agent.max_output_tokens
+    )
+    error_message = "Use a Foundry project HTTPS URL, a saved agent name, and a positive integer output token cap."
+  }
+}
+
+locals {
+  knowledge_foundry_enabled = var.knowledge_runtime_mode == "azure" && try(var.knowledge_foundry_agent.enabled, false)
+}
+
 variable "knowledge_api_key" {
   description = "Shared key between the Web server proxy and Python API. Never sent to the browser."
   type        = string
