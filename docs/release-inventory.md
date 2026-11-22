@@ -11,6 +11,9 @@ The application repositories own image builds, tests and publication. This root
 owns infrastructure and operator-selected deployment inputs. Its existing
 `app_images` variable still controls which applications Terraform manages. The
 inventory does not change your private variables or enable any resource by itself.
+Applications listed in `pendingApplications` have Terraform configuration and
+await their first verified image. BA requires live Knowledge evidence and is
+enabled separately with its own image digest. See the [BA guide](ba-deployment.md).
 
 ## Select a profile
 

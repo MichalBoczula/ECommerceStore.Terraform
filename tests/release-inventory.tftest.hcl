@@ -16,10 +16,11 @@ run "inventory_tracks_every_supported_application" {
   assert {
     condition = (
       local.release_inventory.schemaVersion == 1 &&
-      toset(keys(local.release_inventory.applications)) == toset(keys(local.app_config)) &&
-      toset(keys(local.release_inventory.applications)) == toset(keys(local.app_names))
+      setunion(keys(local.release_inventory.applications), local.release_inventory.pendingApplications) == toset(keys(local.app_config)) &&
+      toset(keys(local.app_config)) == toset(keys(local.app_names)) &&
+      length(setintersection(keys(local.release_inventory.applications), local.release_inventory.pendingApplications)) == 0
     )
-    error_message = "The release inventory must contain one entry for every Terraform application."
+    error_message = "Each supported Terraform app must have a published release or be marked pending."
   }
 
   assert {
@@ -66,7 +67,7 @@ run "profiles_preserve_store_apps_and_require_real_rag_handoff" {
 
   assert {
     condition = (
-      toset(keys(local.release_profile_images["full-demo"])) == toset(keys(local.app_config)) &&
+      toset(keys(local.release_profile_images["full-demo"])) == setsubtract(keys(local.app_config), ["ba"]) &&
       local.release_inventory.profiles["full-demo"].terraformSettings.knowledge_runtime_mode == "demo" &&
       local.release_inventory.applications.knowledge_api.contentMode == "synthetic-demo" &&
       !contains(keys(local.release_profile_images), "full-azure") &&

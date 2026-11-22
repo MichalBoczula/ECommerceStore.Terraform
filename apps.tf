@@ -159,6 +159,24 @@ locals {
       secrets    = { "knowledge-api-key" = var.knowledge_api_key }
       secret_env = { KNOWLEDGE_API_KEY = "knowledge-api-key" }
     }
+    ba = {
+      port       = 8080
+      live_path  = "/health/live"
+      ready_path = "/health/ready"
+      env        = local.ba_env
+      secrets = {
+        "ba-api-key"        = var.ba_api_key
+        "ba-database-uri"   = var.ba_mongodb_uri
+        "ba-jira-token"     = var.ba_jira_api_token
+        "knowledge-api-key" = var.knowledge_api_key
+      }
+      secret_env = {
+        BA_API_KEY           = "ba-api-key"
+        BA_MONGODB_URI       = "ba-database-uri"
+        BA_JIRA_API_TOKEN    = "ba-jira-token"
+        BA_KNOWLEDGE_API_KEY = "knowledge-api-key"
+      }
+    }
     pact = {
       port       = 8080
       live_path  = "/health/live"
@@ -213,7 +231,7 @@ resource "azurerm_container_app" "app" {
   tags                         = local.tags
 
   dynamic "identity" {
-    for_each = each.key == "knowledge_api" && var.knowledge_foundry_agent != null ? [1] : []
+    for_each = each.key == "ba" || (each.key == "knowledge_api" && var.knowledge_foundry_agent != null) ? [1] : []
     content {
       type = "SystemAssigned"
     }
@@ -345,6 +363,14 @@ resource "azurerm_container_app" "app" {
   ]
 
   lifecycle {
+    precondition {
+      condition = each.key != "ba" || (
+        contains(keys(var.app_images), "knowledge_api") && var.knowledge_runtime_mode == "azure" &&
+        var.knowledge_api_key != null && var.ba_runtime != null && var.ba_api_key != null &&
+        var.ba_mongodb_uri != null && var.ba_jira_api_token != null
+      )
+      error_message = "BA requires live Knowledge API, Foundry and Jira configuration, MongoDB, and the BA, Knowledge and Jira credentials."
+    }
     precondition {
       condition = each.key != "pact" || (
         length(var.pact_publishers) > 0 &&
