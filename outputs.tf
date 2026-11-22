@@ -43,6 +43,11 @@ output "app_urls" {
   value       = { for name, app in azurerm_container_app.app : name => "https://${app.ingress[0].fqdn}" }
 }
 
+output "ba_principal_id" {
+  description = "Grant this BA managed identity Azure AI User on the configured Foundry project."
+  value       = try(azurerm_container_app.app["ba"].identity[0].principal_id, null)
+}
+
 output "payments_fulfillment_job_name" {
   description = "The scheduled Payments fulfillment job, when enabled."
   value       = one(azurerm_container_app_job.payments_fulfillment[*].name)

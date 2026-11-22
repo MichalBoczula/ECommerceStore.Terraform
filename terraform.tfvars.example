@@ -3,6 +3,10 @@ subscription_id = "fcbf086b-8ce4-4ca5-a3d7-0c56489e25f6"
 # Start with the shared infrastructure. Add real apps in subsequent applies.
 app_images = {}
 
+# Add app_images.ba using the BA image-reference artifact when preparing BA/06.
+# Then configure ba_runtime as shown in the BA deployment guide.
+# Supply TF_VAR_ba_api_key, TF_VAR_ba_mongodb_uri and TF_VAR_ba_jira_api_token through the environment.
+
 # Keep existing app entries when adding a service. The optional orders entry uses
 # mb0101/ecommerce-store-invoice-api at the verified immutable digest in README
 # section 8, with DocumentDB readiness and private Blob PDF storage support.

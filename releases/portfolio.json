@@ -1,6 +1,7 @@
 {
   "schemaVersion": 1,
   "releaseId": "portfolio-2026-11-05",
+  "pendingApplications": ["ba"],
   "infrastructureBaseline": {
     "repository": "MichalBoczula/ECommerceStore.Terraform",
     "commitSha": "1f7091c7c379d01f12109c7167f3a5d2777f7151",

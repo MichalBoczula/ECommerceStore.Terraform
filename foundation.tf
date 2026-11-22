@@ -13,6 +13,7 @@ locals {
     livedocs      = "ca-ecommercestore-livedocs-dev"
     knowledge_api = "ca-ecommercestore-ka-api-dev"
     knowledge_web = "ca-ecommercestore-ka-web-dev"
+    ba            = "ca-ecommercestore-ba-dev"
     pact          = "ca-ecommercestore-pact-dev"
     pact_web      = "ca-ecommercestore-pact-web-dev"
   }
