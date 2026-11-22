@@ -1,0 +1,34 @@
+name: Start DEV apps
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency: start-dev-apps
+
+jobs:
+  warmup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Send DEV readiness requests
+        env:
+          START_PRODUCTS_URL: ${{ secrets.START_PRODUCTS_URL }}
+          START_BFF_URL: ${{ secrets.START_BFF_URL }}
+          START_WEB_URL: ${{ secrets.START_WEB_URL }}
+          START_USERS_URL: ${{ secrets.START_USERS_URL }}
+          START_ORDERS_URL: ${{ secrets.START_ORDERS_URL }}
+          START_PAYMENTS_URL: ${{ secrets.START_PAYMENTS_URL }}
+          START_LIVEDOCS_URL: ${{ secrets.START_LIVEDOCS_URL }}
+          START_PACT_URL: ${{ secrets.START_PACT_URL }}
+          START_PACT_WEB_URL: ${{ secrets.START_PACT_WEB_URL }}
+          START_KNOWLEDGE_API_URL: ${{ secrets.START_KNOWLEDGE_API_URL }}
+          START_KNOWLEDGE_WEB_URL: ${{ secrets.START_KNOWLEDGE_WEB_URL }}
+          START_BA_URL: ${{ secrets.START_BA_URL }}
+          START_QA_URL: ${{ secrets.START_QA_URL }}
+        run: python3 scripts/start-dev-apps.py
