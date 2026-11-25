@@ -29,6 +29,6 @@ jobs:
           START_PACT_WEB_URL: ${{ secrets.START_PACT_WEB_URL }}
           START_KNOWLEDGE_API_URL: ${{ secrets.START_KNOWLEDGE_API_URL }}
           START_KNOWLEDGE_WEB_URL: ${{ secrets.START_KNOWLEDGE_WEB_URL }}
-          START_BA_URL: ${{ secrets.START_BA_URL }}
+          START_BA_URL: ${{ secrets.START_BA_API_URL || secrets.START_BA_URL }}
           START_QA_URL: ${{ secrets.START_QA_URL }}
         run: python3 scripts/start-dev-apps.py
