@@ -11,6 +11,12 @@ mcp                    = "docker.io/mb0101/ecommerce-store-mcp@sha256:2f74534463
 
 This BA image contains the Foundry request fix and the Swagger descriptions. Keep the existing BA runtime and Knowledge snapshot configuration.
 
+You can review the complete candidate image map with the current pins preserved before updating your file.
+
+```powershell
+'merge(var.app_images, {for name in ["ba", "agent_orchestrator_api", "agent_orchestrator_web", "mcp"] : name => local.release_inventory.applications[name].imageReference})' | terraform console
+```
+
 [BA image](https://github.com/MichalBoczula/ECommerceStore.BA/actions/runs/45735680474) · [Orchestrator API and worker image](https://github.com/MichalBoczula/ECommerceStore.AgentOrchestrator.Api/actions/runs/45735811493) · [Orchestrator Web image](https://github.com/MichalBoczula/ECommerceStore.AgentOrchestrator.Web/actions/runs/45735829165) · [MCP image](https://github.com/MichalBoczula/ECommerceStore.MCP/actions/runs/45737363187)
 
 ## Configure the Orchestrator

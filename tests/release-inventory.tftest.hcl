@@ -67,7 +67,7 @@ run "profiles_preserve_store_apps_and_require_real_rag_handoff" {
 
   assert {
     condition = (
-      toset(keys(local.release_profile_images["full-demo"])) == setsubtract(keys(local.app_config), ["ba"]) &&
+      toset(keys(local.release_profile_images["full-demo"])) == setunion(keys(local.release_profile_images["store-pact"]), ["knowledge_api", "knowledge_web"]) &&
       local.release_inventory.profiles["full-demo"].terraformSettings.knowledge_runtime_mode == "demo" &&
       local.release_inventory.applications.knowledge_api.contentMode == "synthetic-demo" &&
       !contains(keys(local.release_profile_images), "full-azure") &&
