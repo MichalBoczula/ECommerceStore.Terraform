@@ -4,18 +4,21 @@ locals {
     environment = "dev"
   }
   app_names = {
-    products      = "ca-ecommercestore-products-dev"
-    bff           = "ca-ecommercestore-bff-dev"
-    web           = "ca-ecommercestore-web-dev"
-    users         = "ca-ecommercestore-users-dev"
-    orders        = "ca-ecommercestore-orders-dev"
-    payments      = "ca-ecommercestore-payments-dev"
-    livedocs      = "ca-ecommercestore-livedocs-dev"
-    knowledge_api = "ca-ecommercestore-ka-api-dev"
-    knowledge_web = "ca-ecommercestore-ka-web-dev"
-    ba            = "ca-ecommercestore-ba-dev"
-    pact          = "ca-ecommercestore-pact-dev"
-    pact_web      = "ca-ecommercestore-pact-web-dev"
+    products               = "ca-ecommercestore-products-dev"
+    bff                    = "ca-ecommercestore-bff-dev"
+    web                    = "ca-ecommercestore-web-dev"
+    users                  = "ca-ecommercestore-users-dev"
+    orders                 = "ca-ecommercestore-orders-dev"
+    payments               = "ca-ecommercestore-payments-dev"
+    livedocs               = "ca-ecommercestore-livedocs-dev"
+    knowledge_api          = "ca-ecommercestore-ka-api-dev"
+    knowledge_web          = "ca-ecommercestore-ka-web-dev"
+    ba                     = "ca-ecommercestore-ba-dev"
+    agent_orchestrator_api = "ca-ecommercestore-ao-api-dev"
+    agent_orchestrator_web = "ca-ecommercestore-ao-web-dev"
+    mcp                    = "ca-ecommercestore-mcp-dev"
+    pact                   = "ca-ecommercestore-pact-dev"
+    pact_web               = "ca-ecommercestore-pact-web-dev"
   }
   app_urls = {
     for name, app_name in local.app_names :
