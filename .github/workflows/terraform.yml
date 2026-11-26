@@ -12,6 +12,8 @@ jobs:
       TF_IN_AUTOMATION: "true"
     steps:
       - uses: actions/checkout@v4
+      - name: Test the DEV warm-up probes
+        run: python3 -m unittest discover -s tests -p test_start_dev_apps.py
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.13.5
