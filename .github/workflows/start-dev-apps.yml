@@ -30,5 +30,7 @@ jobs:
           START_KNOWLEDGE_API_URL: ${{ secrets.START_KNOWLEDGE_API_URL }}
           START_KNOWLEDGE_WEB_URL: ${{ secrets.START_KNOWLEDGE_WEB_URL }}
           START_BA_URL: ${{ secrets.START_BA_API_URL || secrets.START_BA_URL }}
+          START_AGENT_ORCHESTRATOR_WEB_URL: ${{ secrets.START_AGENT_ORCHESTRATOR_WEB_URL }}
+          START_MCP_URL: ${{ secrets.START_MCP_URL }}
           START_QA_URL: ${{ secrets.START_QA_URL }}
         run: python3 scripts/start-dev-apps.py
