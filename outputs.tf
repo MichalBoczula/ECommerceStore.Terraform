@@ -48,6 +48,16 @@ output "ba_principal_id" {
   value       = try(azurerm_container_app.app["ba"].identity[0].principal_id, null)
 }
 
+output "agent_orchestrator_worker_name" {
+  description = "Name of the ingress-free Agent Orchestrator worker when enabled."
+  value       = one(azurerm_container_app.agent_orchestrator_worker[*].name)
+}
+
+output "mcp_url" {
+  description = "Public Streamable HTTP endpoint when the catalog MCP server is enabled."
+  value       = try("https://${azurerm_container_app.app["mcp"].ingress[0].fqdn}/mcp", null)
+}
+
 output "payments_fulfillment_job_name" {
   description = "The scheduled Payments fulfillment job, when enabled."
   value       = one(azurerm_container_app_job.payments_fulfillment[*].name)

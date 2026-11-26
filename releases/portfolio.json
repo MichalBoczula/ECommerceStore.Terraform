@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "releaseId": "portfolio-2026-11-05",
-  "pendingApplications": ["ba"],
+  "releaseId": "portfolio-2026-11-26",
+  "pendingApplications": [],
   "infrastructureBaseline": {
     "repository": "MichalBoczula/ECommerceStore.Terraform",
     "commitSha": "1f7091c7c379d01f12109c7167f3a5d2777f7151",
@@ -130,6 +130,50 @@
         "runAttempt": 1,
         "jobId": 124966849832,
         "url": "https://github.com/MichalBoczula/ECommerceStore.KnowledgeAssistant.Web/actions/runs/41346209448"
+      }
+    },
+    "ba": {
+      "repository": "MichalBoczula/ECommerceStore.BA",
+      "commitSha": "1ccb540326e8e17713cd8d14c97fcbcb0152b993",
+      "imageReference": "docker.io/mb0101/ecommerce-store-ba@sha256:420a26ea2b270e6779081f548d042dfde9ce3a90486d1a25072d2a28f5123c21",
+      "publication": {
+        "runId": 45735680474,
+        "runAttempt": 1,
+        "jobId": 139628202966,
+        "url": "https://github.com/MichalBoczula/ECommerceStore.BA/actions/runs/45735680474"
+      }
+    },
+    "agent_orchestrator_api": {
+      "repository": "MichalBoczula/ECommerceStore.AgentOrchestrator.Api",
+      "commitSha": "46e9c4748be6803d38e7eb9db9c6a5162dee06ae",
+      "imageReference": "docker.io/mb0101/ecommerce-store-agent-orchestrator-api@sha256:124ea68b98f7919f88e5c38a13533d5db0efa59e190ebf4bb7831a99cbc0a55a",
+      "publication": {
+        "runId": 45735811493,
+        "runAttempt": 1,
+        "jobId": 139628647915,
+        "url": "https://github.com/MichalBoczula/ECommerceStore.AgentOrchestrator.Api/actions/runs/45735811493"
+      }
+    },
+    "agent_orchestrator_web": {
+      "repository": "MichalBoczula/ECommerceStore.AgentOrchestrator.Web",
+      "commitSha": "8e1c8109c3dad5bfdb79f0da0ef5c83dc77aab40",
+      "imageReference": "docker.io/mb0101/ecommerce-store-agent-orchestrator-web@sha256:cd32d3acfa37b8ba3f20ad598fb77fc2c839f6eae32510ff4f6717b1caf53466",
+      "publication": {
+        "runId": 45735829165,
+        "runAttempt": 1,
+        "jobId": 139628711251,
+        "url": "https://github.com/MichalBoczula/ECommerceStore.AgentOrchestrator.Web/actions/runs/45735829165"
+      }
+    },
+    "mcp": {
+      "repository": "MichalBoczula/ECommerceStore.MCP",
+      "commitSha": "d2098d6ba945b9b417e27d4ea3d176d211b599fe",
+      "imageReference": "docker.io/mb0101/ecommerce-store-mcp@sha256:2f745344636a89e47aed154d84d31c6652a72cb5ee7ff3cb6c88ef3ac9bc63e6",
+      "publication": {
+        "runId": 45737363187,
+        "runAttempt": 1,
+        "jobId": 139633714643,
+        "url": "https://github.com/MichalBoczula/ECommerceStore.MCP/actions/runs/45737363187"
       }
     }
   },

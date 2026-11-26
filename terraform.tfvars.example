@@ -7,6 +7,8 @@ app_images = {}
 # Then configure ba_runtime as shown in the BA deployment guide.
 # Supply TF_VAR_ba_api_key, TF_VAR_ba_mongodb_uri and TF_VAR_ba_jira_api_token through the environment.
 
+# For Agent Orchestrator and MCP, see docs/agents-deployment.md.
+
 # Keep existing app entries when adding a service. The optional orders entry uses
 # mb0101/ecommerce-store-invoice-api at the verified immutable digest in README
 # section 8, with DocumentDB readiness and private Blob PDF storage support.

@@ -177,6 +177,30 @@ locals {
         BA_KNOWLEDGE_API_KEY = "knowledge-api-key"
       }
     }
+    agent_orchestrator_api = {
+      port       = 8080
+      live_path  = "/openapi.json"
+      ready_path = "/openapi.json"
+      env        = local.agent_orchestrator_api_env
+      secrets    = { "ao-mongodb-uri" = local.agent_orchestrator_mongodb_uri }
+      secret_env = { AO_MONGODB_URI = "ao-mongodb-uri" }
+    }
+    agent_orchestrator_web = {
+      port       = 8080
+      live_path  = "/health/live"
+      ready_path = "/health/ready"
+      env        = { AO_API_URL = "http://${local.app_names.agent_orchestrator_api}" }
+      secrets    = {}
+      secret_env = {}
+    }
+    mcp = {
+      port       = 8080
+      live_path  = "/health/live"
+      ready_path = "/health/live"
+      env        = { ECOMMERCE_BFF_BASE_URL = "http://${local.app_names.bff}" }
+      secrets    = {}
+      secret_env = {}
+    }
     pact = {
       port       = 8080
       live_path  = "/health/live"
@@ -267,9 +291,9 @@ resource "azurerm_container_app" "app" {
     }
   }
 
-  # Public URLs make each educational app easy to inspect during deployment.
+  # Orchestrator Web forwards authenticated requests to its internal API.
   ingress {
-    external_enabled           = each.key == "pact" ? var.pact_ingress_external : true
+    external_enabled           = each.key == "pact" ? var.pact_ingress_external : each.key != "agent_orchestrator_api"
     allow_insecure_connections = false
     target_port                = local.app_config[each.key].port
     transport                  = "http"
@@ -370,6 +394,18 @@ resource "azurerm_container_app" "app" {
         var.ba_mongodb_uri != null && var.ba_jira_api_token != null
       )
       error_message = "BA requires live Knowledge API, Foundry and Jira configuration, MongoDB, and the BA, Knowledge and Jira credentials."
+    }
+    precondition {
+      condition     = each.key != "agent_orchestrator_api" || var.agent_orchestrator_auth != null
+      error_message = "The Agent Orchestrator API requires an issuer, audience and JWKS endpoint."
+    }
+    precondition {
+      condition     = each.key != "agent_orchestrator_web" || contains(keys(var.app_images), "agent_orchestrator_api")
+      error_message = "Keep the Agent Orchestrator API image when adding Agent Orchestrator Web."
+    }
+    precondition {
+      condition     = each.key != "mcp" || contains(keys(var.app_images), "bff")
+      error_message = "The storefront MCP server requires the BFF image for its catalog tools."
     }
     precondition {
       condition = each.key != "pact" || (

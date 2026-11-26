@@ -1,7 +1,7 @@
 # TF/01 — Shared release inventory
 
 [`releases/portfolio.json`](../releases/portfolio.json) records the selected release
-for each of the eleven applications. Each entry names the source repository,
+for each supported application. Each entry names the source repository,
 full commit SHA, immutable Docker Hub reference, and CI run, attempt and publication
 job. The initial inventory was checked against successful publication logs on
 2026-11-05. It records published candidates; running Azure revisions are checked
@@ -12,8 +12,8 @@ owns infrastructure and operator-selected deployment inputs. Its existing
 `app_images` variable still controls which applications Terraform manages. The
 inventory does not change your private variables or enable any resource by itself.
 Applications listed in `pendingApplications` have Terraform configuration and
-await their first verified image. BA requires live Knowledge evidence and is
-enabled separately with its own image digest. See the [BA guide](ba-deployment.md).
+await their first verified image. BA, Agent Orchestrator and MCP have their own
+verified image pins and are enabled separately. See the [agents deployment guide](agents-deployment.md).
 
 ## Select a profile
 

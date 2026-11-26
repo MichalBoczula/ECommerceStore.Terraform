@@ -104,7 +104,11 @@ run "pact_web_uses_shared_environment_and_anonymous_local_proxy" {
 run "pact_web_keeps_existing_apps_and_pact_policy" {
   command = plan
   variables {
-    app_images                  = { for app, release in jsondecode(file("releases/portfolio.json")).applications : app => release.imageReference }
+    app_images = {
+      for app, release in jsondecode(file("releases/portfolio.json")).applications :
+      app => release.imageReference
+      if contains(jsondecode(file("releases/portfolio.json")).profiles["full-demo"].applications, app)
+    }
     knowledge_runtime_mode      = "demo"
     knowledge_api_key           = "synthetic-test-key-0123456789abcdef"
     pact_publishers             = { payments-ci = ["payments"] }
