@@ -90,6 +90,74 @@ run "deploy_orchestrator_and_mcp" {
   }
 }
 
+run "configure_mcp_sandbox_checkout" {
+  command = plan
+
+  variables {
+    app_images = {
+      for app, release in jsondecode(file("releases/portfolio.json")).applications :
+      app => release.imageReference if contains(["products", "users", "bff", "web", "orders", "payments", "mcp"], app)
+    }
+    mcp_checkout_auth = {
+      tenant_id     = "00000000-0000-4000-8000-000000000001"
+      api_client_id = "00000000-0000-4000-8000-000000000002"
+    }
+    mcp_checkout_identity_key      = "synthetic-mcp-identity-key-at-least-32-characters"
+    payments_stripe_enabled        = true
+    payments_fulfillment_enabled   = true
+    payments_stripe_secret_key     = "sk_test_synthetic"
+    payments_stripe_webhook_secret = "whsec_synthetic"
+  }
+
+  assert {
+    condition = alltrue([
+      for name, value in {
+        ECOMMERCE_BFF_BASE_URL                 = "http://ca-ecommercestore-bff-dev"
+        ECOMMERCE_CHECKOUT_AUTH__TENANT_ID     = var.mcp_checkout_auth.tenant_id
+        ECOMMERCE_CHECKOUT_AUTH__API_CLIENT_ID = var.mcp_checkout_auth.api_client_id
+        ECOMMERCE_CHECKOUT_AUTH__RESOURCE_URL  = "https://ca-ecommercestore-mcp-dev.synthetic.francecentral.azurecontainerapps.io/mcp"
+        } : anytrue([
+          for env in azurerm_container_app.app["mcp"].template[0].container[0].env :
+          env.name == name && env.value == value
+      ])
+    ])
+    error_message = "MCP checkout must use the configured Entra API, its public MCP endpoint and the internal BFF."
+  }
+
+  assert {
+    condition = (
+      one(azurerm_container_app.app["mcp"].secret).name == "mcp-checkout-identity-key" &&
+      one(azurerm_container_app.app["mcp"].secret).value == var.mcp_checkout_identity_key &&
+      anytrue([
+        for env in azurerm_container_app.app["mcp"].template[0].container[0].env :
+        env.name == "ECOMMERCE_CHECKOUT_AUTH__IDENTITY_KEY" && env.secret_name == "mcp-checkout-identity-key"
+      ])
+    )
+    error_message = "The identity key must be provided to MCP as an Azure Container Apps secret."
+  }
+}
+
+run "reject_mcp_checkout_without_identity_key" {
+  command = plan
+
+  variables {
+    app_images = {
+      for app, release in jsondecode(file("releases/portfolio.json")).applications :
+      app => release.imageReference if contains(["products", "users", "bff", "web", "orders", "payments", "mcp"], app)
+    }
+    mcp_checkout_auth = {
+      tenant_id     = "00000000-0000-4000-8000-000000000001"
+      api_client_id = "00000000-0000-4000-8000-000000000002"
+    }
+    payments_stripe_enabled        = true
+    payments_fulfillment_enabled   = true
+    payments_stripe_secret_key     = "sk_test_synthetic"
+    payments_stripe_webhook_secret = "whsec_synthetic"
+  }
+
+  expect_failures = [azurerm_container_app.app["mcp"]]
+}
+
 run "configure_entra_for_orchestrator_web" {
   command = plan
 
