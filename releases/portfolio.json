@@ -143,6 +143,17 @@
         "url": "https://github.com/MichalBoczula/ECommerceStore.BA/actions/runs/45735680474"
       }
     },
+    "qa": {
+      "repository": "MichalBoczula/ECommerceStore.QA",
+      "commitSha": "2bb098c66147e7ca2cc3e9271c85a6bd9b60334d",
+      "imageReference": "docker.io/mb0101/ecommerce-store-qa@sha256:e567c44c6aaf14619fdce2484fe0130f0dc43edb4168fc93c054e04b1f044db2",
+      "publication": {
+        "runId": 45584621589,
+        "runAttempt": 1,
+        "jobId": 139102955373,
+        "url": "https://github.com/MichalBoczula/ECommerceStore.QA/actions/runs/45584621589"
+      }
+    },
     "agent_orchestrator_api": {
       "repository": "MichalBoczula/ECommerceStore.AgentOrchestrator.Api",
       "commitSha": "46e9c4748be6803d38e7eb9db9c6a5162dee06ae",
