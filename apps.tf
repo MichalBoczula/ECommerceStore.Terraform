@@ -218,9 +218,9 @@ locals {
       port       = 8080
       live_path  = "/health/live"
       ready_path = "/health/live"
-      env        = { ECOMMERCE_BFF_BASE_URL = "http://${local.app_names.bff}" }
-      secrets    = {}
-      secret_env = {}
+      env        = merge({ ECOMMERCE_BFF_BASE_URL = "http://${local.app_names.bff}" }, local.mcp_checkout_auth_env)
+      secrets    = var.mcp_checkout_auth == null ? {} : { "mcp-checkout-identity-key" = var.mcp_checkout_identity_key }
+      secret_env = var.mcp_checkout_auth == null ? {} : { ECOMMERCE_CHECKOUT_AUTH__IDENTITY_KEY = "mcp-checkout-identity-key" }
     }
     pact = {
       port       = 8080
@@ -434,6 +434,12 @@ resource "azurerm_container_app" "app" {
     precondition {
       condition     = each.key != "mcp" || contains(keys(var.app_images), "bff")
       error_message = "The storefront MCP server requires the BFF image for its catalog tools."
+    }
+    precondition {
+      condition = each.key != "mcp" || var.mcp_checkout_auth == null || (
+        var.mcp_checkout_identity_key != null && var.payments_stripe_enabled && var.payments_fulfillment_enabled
+      )
+      error_message = "MCP sandbox checkout requires a stable identity key, Stripe sandbox checkout and the Payments fulfillment job."
     }
     precondition {
       condition = each.key != "pact" || (

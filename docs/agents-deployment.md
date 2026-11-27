@@ -113,4 +113,19 @@ terraform output -raw agent_orchestrator_worker_name
 
 Verify the BA Swagger shows operations with descriptions and use a fresh catalog session or retry the existing draft request against its pinned snapshot. For Orchestrator, use a valid `runs.read` access token to query `/api/v1/runs?limit=1` on the Web origin. The worker has no ingress. Check its revision and replica in the Azure portal. For MCP, connect MCP Inspector to `mcp_url`, list two phones and call the details tool for one. The public endpoint serves the store's catalog and routes through the existing BFF.
 
+## Enable MCP sandbox checkout on DEV
+
+Pin `app_images.mcp` to a published checkout-capable image. Register a Microsoft Entra v2 API dedicated to the MCP server. Use the default Application ID URI and expose the delegated `mcp.checkout` scope. Grant the scope to the client that signs in. Add the directory tenant ID and the MCP API application client ID to `terraform.tfvars`.
+
+```hcl
+mcp_checkout_auth = {
+  tenant_id     = "<directory tenant ID>"
+  api_client_id = "<MCP API application client ID>"
+}
+```
+
+Supply a stable random key of at least 32 characters through `TF_VAR_mcp_checkout_identity_key` in the session running Terraform. Keep the key across deployments to preserve customer and order access. Checkout requires the existing Stripe Sandbox configuration and `payments_fulfillment_enabled = true`. Terraform sets the public MCP resource URL and passes the key as a Container Apps secret.
+
+After applying, use `terraform output -raw mcp_url` with a delegated MCP token. Run a purchase with the synthetic profile, complete the payment on the hosted Stripe Sandbox page, then verify the completed invoice PDF. [MCP checkout and Code Mode](https://github.com/MichalBoczula/ECommerceStore.MCP#enable-sandbox-checkout)
+
 [BA run guide](https://github.com/MichalBoczula/ECommerceStore.BA/blob/main/docs/workflow.md) · [Orchestrator walkthrough](https://github.com/MichalBoczula/ECommerceStore.AgentOrchestrator.Api/blob/main/docs/demo.md) · [Azure Container Apps service discovery](https://learn.microsoft.com/azure/container-apps/connect-apps)
