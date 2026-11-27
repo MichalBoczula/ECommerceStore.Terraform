@@ -177,6 +177,27 @@ locals {
         BA_KNOWLEDGE_API_KEY = "knowledge-api-key"
       }
     }
+    qa = {
+      port       = 8080
+      live_path  = "/health/live"
+      ready_path = "/health/ready"
+      env = {
+        QA_BA_API_URL       = "http://${local.app_names.ba}"
+        QA_MONGODB_DATABASE = "ecommerce_store_qa"
+      }
+      secrets = {
+        "qa-api-key"          = var.qa_api_key
+        "qa-mongodb-uri"      = var.qa_mongodb_uri != null ? var.qa_mongodb_uri : local.users_connection_string
+        "ba-api-key"          = var.ba_api_key
+        "qa-e2e-github-token" = var.qa_e2e_github_token
+      }
+      secret_env = {
+        QA_API_KEY          = "qa-api-key"
+        QA_MONGODB_URI      = "qa-mongodb-uri"
+        QA_BA_API_KEY       = "ba-api-key"
+        QA_E2E_GITHUB_TOKEN = "qa-e2e-github-token"
+      }
+    }
     agent_orchestrator_api = {
       port       = 8080
       live_path  = "/openapi.json"
@@ -394,6 +415,13 @@ resource "azurerm_container_app" "app" {
         var.ba_mongodb_uri != null && var.ba_jira_api_token != null
       )
       error_message = "BA requires live Knowledge API, Foundry and Jira configuration, MongoDB, and the BA, Knowledge and Jira credentials."
+    }
+    precondition {
+      condition = each.key != "qa" || (
+        contains(keys(var.app_images), "ba") && var.ba_api_key != null &&
+        var.qa_api_key != null && var.qa_e2e_github_token != null
+      )
+      error_message = "QA requires the BA deployment and its API key, a QA API key, and the Storefront E2E GitHub token."
     }
     precondition {
       condition     = each.key != "agent_orchestrator_api" || var.agent_orchestrator_auth != null
