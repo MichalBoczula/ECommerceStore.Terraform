@@ -210,7 +210,7 @@ locals {
       port       = 8080
       live_path  = "/health/live"
       ready_path = "/health/ready"
-      env        = { AO_API_URL = "http://${local.app_names.agent_orchestrator_api}" }
+      env        = merge({ AO_API_URL = "http://${local.app_names.agent_orchestrator_api}" }, local.agent_orchestrator_web_entra_env)
       secrets    = {}
       secret_env = {}
     }
