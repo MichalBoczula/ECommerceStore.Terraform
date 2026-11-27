@@ -22,7 +22,7 @@ base address, such as `https://<app-fqdn>`. The workflow adds the probe path.
 | `ca-ecommercestore-ao-web-dev` | `START_AGENT_ORCHESTRATOR_WEB_URL` (optional override) | `/health/ready` |
 | `ca-ecommercestore-ao-api-dev` via Orchestrator Web | Same Orchestrator Web origin | `/api/v1/runs?limit=1` |
 | `ca-ecommercestore-mcp-dev` | `START_MCP_URL` (optional override) | `/health/live` |
-| QA API when deployed | `START_QA_URL` (optional) | `/health/ready` |
+| `ca-ecommercestore-qa-dev` when deployed | `START_QA_URL` (optional) | `/health/ready` |
 
 If an existing HTTPS origin uses its default Azure Container Apps hostname, the
 workflow uses that environment domain for Orchestrator Web and MCP. To set an
