@@ -49,7 +49,7 @@ APPS = (
         bearer_challenge=True,
     ),
     App(MCP, "START_MCP_URL", "/health/live", optional=True),
-    App("QA API", "START_QA_URL", optional=True),
+    App("ca-ecommercestore-qa-dev", "START_QA_URL", optional=True),
 )
 MAX_ATTEMPTS = 6
 REQUEST_TIMEOUT_SECONDS = 45

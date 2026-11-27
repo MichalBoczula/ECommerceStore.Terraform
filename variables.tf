@@ -46,7 +46,7 @@ variable "mongo_admin_password" {
 }
 
 variable "app_images" {
-  description = "Apps to deploy, including agent_orchestrator_api, agent_orchestrator_web and mcp. Empty creates only the foundation. Keep existing supported entries when adding another service."
+  description = "Apps to deploy, including qa, agent_orchestrator_api, agent_orchestrator_web and mcp. Empty creates only the foundation. Keep existing supported entries when adding another service."
   type        = map(string)
   default     = {}
 

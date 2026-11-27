@@ -1,4 +1,4 @@
-# BA, Agent Orchestrator and MCP on DEV
+# BA, QA, Agent Orchestrator and MCP on DEV
 
 Use the existing Azure Container Apps environment and keep all entries in your local `app_images` map. Replace the `ba` entry and add the other three entries.
 
@@ -18,6 +18,26 @@ You can review the complete candidate image map with the current pins preserved 
 ```
 
 [BA image](https://github.com/MichalBoczula/ECommerceStore.BA/actions/runs/45735680474) · [Orchestrator API and worker image](https://github.com/MichalBoczula/ECommerceStore.AgentOrchestrator.Api/actions/runs/45735811493) · [Orchestrator Web image](https://github.com/MichalBoczula/ECommerceStore.AgentOrchestrator.Web/actions/runs/45735829165) · [MCP image](https://github.com/MichalBoczula/ECommerceStore.MCP/actions/runs/45737363187)
+
+## Deploy QA on DEV
+
+Add the QA digest to the existing `app_images` map alongside the BA deployment.
+
+```hcl
+qa = "docker.io/mb0101/ecommerce-store-qa@sha256:e567c44c6aaf14619fdce2484fe0130f0dc43edb4168fc93c054e04b1f044db2"
+```
+
+Supply `TF_VAR_qa_api_key` as the shared QA API key and
+`TF_VAR_qa_e2e_github_token` as a GitHub token with Contents and Pull requests
+write access scoped to `ECommerceStore.E2E`. QA uses the existing BA key and
+the `ecommerce_store_qa` database on the shared DEV DocumentDB cluster. Set
+`TF_VAR_qa_mongodb_uri` for a dedicated cluster.
+
+After apply, use `app_urls.qa` from `terraform output -json app_urls` for
+`START_QA_URL` in the warm-up workflow. Use the same origin for `/swagger`
+and `/health/ready`.
+
+[QA image](https://github.com/MichalBoczula/ECommerceStore.QA/actions/runs/45584621589) · [QA API guide](https://github.com/MichalBoczula/ECommerceStore.QA#author-a-storefront-bdd-test)
 
 ## Configure the Orchestrator
 
@@ -39,7 +59,6 @@ To enable BA-to-QA authoring after deploying QA, set the following object using 
 
 ```hcl
 agent_orchestrator_authoring = {
-  qa_api_url      = "https://<qa-dev-host>"
   ba_session_id   = "<session UUID>"
   ba_run_id       = "<run UUID>"
   draft_sha256    = "<draft SHA-256>"
@@ -47,7 +66,13 @@ agent_orchestrator_authoring = {
 }
 ```
 
-Set `TF_VAR_agent_orchestrator_qa_api_key` in the deployment shell alongside the existing `TF_VAR_ba_api_key`. Use `TF_VAR_agent_orchestrator_github_read_token` to read Storefront E2E artifacts and `TF_VAR_agent_orchestrator_langsmith_api_key` to enable worker tracing. With authoring unset, runs wait at `validating_handoff` for a configured worker.
+The worker connects to managed QA through its internal Container Apps address
+and shares `TF_VAR_qa_api_key`. For an external QA deployment, set
+`qa_api_url` to its HTTPS origin and supply `TF_VAR_agent_orchestrator_qa_api_key`.
+Use `TF_VAR_agent_orchestrator_github_read_token` to read Storefront E2E
+artifacts and `TF_VAR_agent_orchestrator_langsmith_api_key` to enable worker
+tracing. With authoring unset, runs wait at `validating_handoff` for a
+configured worker.
 
 ## Plan and apply
 

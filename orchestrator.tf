@@ -30,9 +30,9 @@ variable "agent_orchestrator_mongodb_uri" {
 }
 
 variable "agent_orchestrator_authoring" {
-  description = "Optional QA API origin and published BA catalog handoff pinned by the worker."
+  description = "Optional published BA catalog handoff pinned by the worker. Set qa_api_url when using an external QA API."
   type = object({
-    qa_api_url      = string
+    qa_api_url      = optional(string)
     ba_session_id   = string
     ba_run_id       = string
     draft_sha256    = string
@@ -42,17 +42,17 @@ variable "agent_orchestrator_authoring" {
 
   validation {
     condition = var.agent_orchestrator_authoring == null ? true : (
-      can(regex("^https://[A-Za-z0-9][A-Za-z0-9.-]*(:[0-9]+)?/?$", var.agent_orchestrator_authoring.qa_api_url)) &&
+      (var.agent_orchestrator_authoring.qa_api_url == null || can(regex("^https://[A-Za-z0-9][A-Za-z0-9.-]*(:[0-9]+)?/?$", var.agent_orchestrator_authoring.qa_api_url))) &&
       alltrue([for id in [var.agent_orchestrator_authoring.ba_session_id, var.agent_orchestrator_authoring.ba_run_id] : can(regex("^[0-9A-Fa-f]{8}(-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}$", id))]) &&
       can(regex("^[a-f0-9]{64}$", var.agent_orchestrator_authoring.draft_sha256)) &&
       try(var.agent_orchestrator_authoring.criterion_index >= 0 && floor(var.agent_orchestrator_authoring.criterion_index) == var.agent_orchestrator_authoring.criterion_index, false)
     )
-    error_message = "Supply the HTTPS QA origin and published BA session UUID, run UUID, draft SHA-256 and zero-based criterion index."
+    error_message = "Supply the published BA session UUID, run UUID, draft SHA-256 and zero-based criterion index. An external QA origin must use HTTPS."
   }
 }
 
 variable "agent_orchestrator_qa_api_key" {
-  description = "QA shared API key for the Agent Orchestrator worker when authoring is enabled."
+  description = "QA shared API key for the Agent Orchestrator worker when using an explicitly configured QA API URL."
   type        = string
   sensitive   = true
   default     = null
@@ -93,12 +93,14 @@ locals {
     AO_AUTH_AUDIENCE = var.agent_orchestrator_auth.audience
     AO_AUTH_JWKS_URL = var.agent_orchestrator_auth.jwks_url
   }
-  agent_orchestrator_mongodb_uri = var.agent_orchestrator_mongodb_uri != null ? var.agent_orchestrator_mongodb_uri : local.users_connection_string
-  agent_orchestrator_authoring   = var.agent_orchestrator_authoring != null
+  agent_orchestrator_mongodb_uri     = var.agent_orchestrator_mongodb_uri != null ? var.agent_orchestrator_mongodb_uri : local.users_connection_string
+  agent_orchestrator_authoring       = var.agent_orchestrator_authoring != null
+  agent_orchestrator_uses_managed_qa = try(var.agent_orchestrator_authoring.qa_api_url == null, false)
+  agent_orchestrator_worker_qa_key   = local.agent_orchestrator_uses_managed_qa ? var.qa_api_key : var.agent_orchestrator_qa_api_key
 
   agent_orchestrator_worker_env = local.agent_orchestrator_authoring ? {
     AO_BA_API_URL = "http://${local.app_names.ba}"
-    AO_QA_API_URL = var.agent_orchestrator_authoring.qa_api_url
+    AO_QA_API_URL = local.agent_orchestrator_uses_managed_qa ? "http://${local.app_names.qa}" : var.agent_orchestrator_authoring.qa_api_url
     AO_SUPPORTED_HANDOFF = jsonencode({
       baSessionId    = var.agent_orchestrator_authoring.ba_session_id
       baRunId        = var.agent_orchestrator_authoring.ba_run_id
@@ -110,7 +112,7 @@ locals {
     "ao-mongodb-uri" = local.agent_orchestrator_mongodb_uri
     }, local.agent_orchestrator_authoring ? {
     "ba-api-key" = var.ba_api_key
-    "qa-api-key" = var.agent_orchestrator_qa_api_key
+    "qa-api-key" = local.agent_orchestrator_worker_qa_key
     } : {}, var.agent_orchestrator_github_read_token != null ? {
     "github-read-token" = var.agent_orchestrator_github_read_token
     } : {}, var.agent_orchestrator_langsmith_api_key != null ? {
@@ -192,9 +194,11 @@ resource "azurerm_container_app" "agent_orchestrator_worker" {
   lifecycle {
     precondition {
       condition = !local.agent_orchestrator_authoring || (
-        contains(keys(var.app_images), "ba") && var.ba_api_key != null && var.agent_orchestrator_qa_api_key != null
+        contains(keys(var.app_images), "ba") && var.ba_api_key != null &&
+        (!local.agent_orchestrator_uses_managed_qa || contains(keys(var.app_images), "qa")) &&
+        local.agent_orchestrator_worker_qa_key != null
       )
-      error_message = "Orchestrator authoring requires the BA deployment and both the BA and QA API keys."
+      error_message = "Orchestrator authoring requires the BA deployment and its API key plus either a managed QA deployment with its API key or an external QA URL and key."
     }
   }
 }

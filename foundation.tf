@@ -14,6 +14,7 @@ locals {
     knowledge_api          = "ca-ecommercestore-ka-api-dev"
     knowledge_web          = "ca-ecommercestore-ka-web-dev"
     ba                     = "ca-ecommercestore-ba-dev"
+    qa                     = "ca-ecommercestore-qa-dev"
     agent_orchestrator_api = "ca-ecommercestore-ao-api-dev"
     agent_orchestrator_web = "ca-ecommercestore-ao-web-dev"
     mcp                    = "ca-ecommercestore-mcp-dev"
