@@ -90,6 +90,47 @@ run "deploy_orchestrator_and_mcp" {
   }
 }
 
+run "configure_entra_for_orchestrator_web" {
+  command = plan
+
+  variables {
+    app_images = {
+      agent_orchestrator_api = "docker.io/synthetic/ao-api@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      agent_orchestrator_web = "docker.io/synthetic/ao-web@sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    }
+    agent_orchestrator_auth = {
+      issuer   = "https://login.microsoftonline.com/00000000-0000-4000-8000-000000000001/v2.0"
+      audience = "00000000-0000-4000-8000-000000000002"
+      jwks_url = "https://login.microsoftonline.com/00000000-0000-4000-8000-000000000001/discovery/v2.0/keys"
+    }
+    agent_orchestrator_web_entra_client_id = "00000000-0000-4000-8000-000000000003"
+  }
+
+  assert {
+    condition = alltrue([
+      for name, value in {
+        AO_API_URL             = "http://ca-ecommercestore-ao-api-dev"
+        AO_ENTRA_TENANT_ID     = "00000000-0000-4000-8000-000000000001"
+        AO_ENTRA_CLIENT_ID     = var.agent_orchestrator_web_entra_client_id
+        AO_ENTRA_API_CLIENT_ID = var.agent_orchestrator_auth.audience
+        } : anytrue([
+          for env in azurerm_container_app.app["agent_orchestrator_web"].template[0].container[0].env : env.name == name && env.value == value
+      ])
+    ])
+    error_message = "Orchestrator Web must receive the public Entra settings and the internal API origin."
+  }
+}
+
+run "reject_incompatible_orchestrator_web_entra_config" {
+  command = plan
+
+  variables {
+    agent_orchestrator_web_entra_client_id = "00000000-0000-4000-8000-000000000003"
+  }
+
+  expect_failures = [var.agent_orchestrator_web_entra_client_id]
+}
+
 run "reject_orchestrator_api_without_auth" {
   command = plan
   variables {

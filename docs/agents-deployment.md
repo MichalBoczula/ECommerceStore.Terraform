@@ -31,7 +31,23 @@ agent_orchestrator_auth = {
 }
 ```
 
-The API requires an RS256 bearer with delegated `runs.read`, `runs.start` or `runs.review` for the matching operation. Web forwards the caller's authorization header to the internal API. The current Web release requires the caller to supply that bearer and has no sign-in flow in the browser.
+The API requires an RS256 bearer with delegated `runs.read`, `runs.start` or `runs.review` for the matching operation. Web forwards the caller's authorization header to the internal API.
+
+For browser sign-in, use the published Web image that includes MSAL and
+register a single-tenant Entra SPA with the three delegated API permissions.
+Add the HTTPS Web origin with `/auth/redirect` for sign-in and `/` for
+sign-out. Set the SPA application client ID in the local deployment file.
+
+```hcl
+agent_orchestrator_web_entra_client_id = "<Web SPA application client ID>"
+```
+
+Terraform passes the tenant from the configured v2 issuer and the API
+application ID from the audience to Web. Use the API application ID URI
+`api://<API application client ID>` in Entra. The Web image reference comes
+from the CI `image-reference` artifact.
+
+[Orchestrator Web configuration](https://github.com/MichalBoczula/ECommerceStore.AgentOrchestrator.Web#enable-entra-sign-in)
 
 The Orchestrator API and worker share the `ecommerce_store_agent_orchestrator` database on the DEV DocumentDB cluster by default. Supply `TF_VAR_agent_orchestrator_mongodb_uri` if using a dedicated MongoDB connection. The worker uses the API image, has one replica to drain MongoDB claims and runs independently of HTTP traffic.
 
